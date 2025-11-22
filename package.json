@@ -1,0 +1,14 @@
+{
+  "name": "wirs-whatsapp-safex",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "body-parser": "^1.20.2",
+    "express": "^4.19.0",
+    "openai": "^4.0.0"
+  }
+}
