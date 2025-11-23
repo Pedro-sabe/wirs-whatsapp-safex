@@ -190,8 +190,23 @@ app.get("/", (req, res) => {
 });
 
 // ROTA DE HEALTHCHECK
-app.get("/health", (req, res) => {
-  res.status(200).send("SAFEX OK");
+// ROTA DE TESTE DO SAFEX (sem WhatsApp)
+app.get("/test-safex", async (req, res) => {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: "Paciente com eGFR 38. É seguro usar contraste iodado?" }
+      ],
+      temperature: 0.1,
+    });
+
+    const answer = completion.choices[0].message.content;
+    res.status(200).send(answer);
+  } catch (err) {
+    res.status(500).send(err.response?.data || err.message);
+  }
 });
 
 // ROTA GET PARA VERIFICAÇÃO DO WEBHOOK (META)
