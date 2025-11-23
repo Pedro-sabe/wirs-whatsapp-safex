@@ -6,12 +6,16 @@ const OpenAI = require("openai");
 const app = express();
 app.use(bodyParser.json());
 
+// -----------------------------------------------------------------------------
 // Cliente OpenAI
+// -----------------------------------------------------------------------------
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// -----------------------------------------------------------------------------
 // SYSTEM PROMPT SAFEX
+// -----------------------------------------------------------------------------
 const SYSTEM_PROMPT = `Você é o SAFEX – Sistema de Avaliação de Segurança e Adequação em Exames de Imagem, destinado a apoiar profissionais da saúde habilitados na tomada de decisões técnicas. Seu comportamento deve ser rigoroso, reprodutível e seguro. Sempre responda em texto puro, compatível com WhatsApp.
 
 1. OBJETIVOS PRINCIPAIS
@@ -184,20 +188,28 @@ Nenhuma resposta do SAFEX é autorização, contraindicação definitiva ou diag
 Sempre encerrar com:  
 Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.`;
 
-// ROTA RAIZ (TESTE RÁPIDO)
+// -----------------------------------------------------------------------------
+// Rotas básicas de teste
+// -----------------------------------------------------------------------------
 app.get("/", (req, res) => {
   res.status(200).send("SAFEX raiz OK");
 });
 
-// ROTA DE HEALTHCHECK
-// ROTA DE TESTE DO SAFEX (sem WhatsApp)
+app.get("/health", (req, res) => {
+  res.status(200).send("SAFEX OK");
+});
+
+// Rota de teste direto do SAFEX (sem WhatsApp)
 app.get("/test-safex", async (req, res) => {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: "Paciente com eGFR 38. É seguro usar contraste iodado?" }
+        {
+          role: "user",
+          content: "Paciente com eGFR 38 mL/min/1,73m². É seguro usar contraste iodado?",
+        },
       ],
       temperature: 0.1,
     });
@@ -205,11 +217,14 @@ app.get("/test-safex", async (req, res) => {
     const answer = completion.choices[0].message.content;
     res.status(200).send(answer);
   } catch (err) {
+    console.error("Erro na rota /test-safex:", err.response?.data || err.message);
     res.status(500).send(err.response?.data || err.message);
   }
 });
 
-// ROTA GET PARA VERIFICAÇÃO DO WEBHOOK (META)
+// -----------------------------------------------------------------------------
+// ROTA GET PARA VERIFICAÇÃO DO WEBHOOK (META/WHATSAPP)
+// -----------------------------------------------------------------------------
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -224,15 +239,35 @@ app.get("/webhook", (req, res) => {
   }
 });
 
+// -----------------------------------------------------------------------------
+// Função utilitária: chamar SAFEX (OpenAI) com texto do usuário
+// -----------------------------------------------------------------------------
+async function chamarSafex(texto) {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4.1-mini",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: texto },
+    ],
+    temperature: 0.1,
+  });
+
+  return (completion.choices[0].message.content || "").trim();
+}
+
+// -----------------------------------------------------------------------------
 // ROTA POST PARA RECEBER MENSAGENS DO WHATSAPP
+// -----------------------------------------------------------------------------
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
 
+    // Verificação mínima de estrutura
     if (
       body.object &&
       body.entry &&
       body.entry[0].changes &&
+      body.entry[0].changes[0].value &&
       body.entry[0].changes[0].value.messages &&
       body.entry[0].changes[0].value.messages[0]
     ) {
@@ -240,42 +275,43 @@ app.post("/webhook", async (req, res) => {
       const from = message.from;
       const text = message.text?.body || "";
 
-      console.log("Mensagem recebida:", text);
+      console.log("Mensagem recebida do WhatsApp:", text);
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4.1-mini",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: text },
-        ],
-        temperature: 0.1,
-      });
-
-      const reply = (completion.choices[0].message.content || "").trim();
+      // Chamar SAFEX
+      const reply = await chamarSafex(text);
       console.log("Resposta SAFEX:", reply);
 
-      // Enviar resposta via WhatsApp Cloud API (temporariamente desativado para teste)
-      // await axios.post(
-      //   `https://graph.facebook.com/v24.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
-      //   {
-      //     messaging_product: "whatsapp",
-      //     to: from,
-      //     type: "text",
-      //     text: { body: reply },
-      //   },
-      //   {
-      //     headers: {
-      //       Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-      //       "Content-Type": "application/json",
-      //     },
-      //   }
-      // );
+      // Enviar resposta via WhatsApp Cloud API
+      try {
+        await axios.post(
+          `https://graph.facebook.com/v21.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
+          {
+            messaging_product: "whatsapp",
+            to: from,
+            type: "text",
+            text: { body: reply },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-      console.log("Envio ao WhatsApp desativado (teste sem integração).");
+        console.log("Mensagem enviada ao WhatsApp com sucesso.");
+      } catch (waErr) {
+        console.error(
+          "Erro ao enviar mensagem ao WhatsApp:",
+          waErr.response?.status,
+          JSON.stringify(waErr.response?.data, null, 2) || waErr.message
+        );
+      }
     } else {
       console.log("Webhook recebido sem mensagem de texto válida.");
     }
 
+    // O WhatsApp exige resposta 200 mesmo em caso de erro interno
     res.sendStatus(200);
   } catch (err) {
     if (err.response) {
@@ -291,9 +327,10 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+// -----------------------------------------------------------------------------
 // INICIAR SERVIDOR
+// -----------------------------------------------------------------------------
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`SAFEX vivo na porta ${PORT}`);
 });
-
