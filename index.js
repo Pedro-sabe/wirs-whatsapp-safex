@@ -204,7 +204,6 @@ app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
 
-    // Verifica se há mensagem de texto válida na estrutura do WhatsApp
     if (
       body.object &&
       body.entry &&
@@ -213,12 +212,11 @@ app.post("/webhook", async (req, res) => {
       body.entry[0].changes[0].value.messages[0]
     ) {
       const message = body.entry[0].changes[0].value.messages[0];
-      const from = message.from;             // número do usuário
-      const text = message.text?.body || ""; // texto da mensagem
+      const from = message.from;
+      const text = message.text?.body || "";
 
       console.log("Mensagem recebida:", text);
 
-      // Chamada ao OpenAI (SAFEX)
       const completion = await openai.chat.completions.create({
         model: "gpt-4.1-mini",
         messages: [
@@ -231,43 +229,28 @@ app.post("/webhook", async (req, res) => {
       const reply = (completion.choices[0].message.content || "").trim();
       console.log("Resposta SAFEX:", reply);
 
-      // Enviar resposta via WhatsApp Cloud API
-      // Enviar resposta via WhatsApp Cloud API (teste simples com log detalhado)
-      try {
-        const respostaWhats = await axios.post(
-          `https://graph.facebook.com/v24.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
-          {
-            messaging_product: "whatsapp",
-            to: from,
-            type: "text",
-            text: { body: "Teste SAFEX: mensagem recebida." },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+      // // Enviar resposta via WhatsApp Cloud API (temporariamente desativado para teste)
+      // await axios.post(
+      //  `https://graph.facebook.com/v24.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
+      //   {
+      //     messaging_product: "whatsapp",
+      //     to: from,
+      //     type: "text",
+      //     text: { body: reply },
+      //   },
+      //   {
+      //     headers: {
+      //       Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+      //       "Content-Type": "application/json",
+      //     },
+      //   }
+      // );
 
-        console.log("Envio WhatsApp OK:", JSON.stringify(respostaWhats.data, null, 2));
-      } catch (erroEnvio) {
-        if (erroEnvio.response) {
-          console.error(
-            "Erro detalhado WhatsApp:",
-            erroEnvio.response.status,
-            JSON.stringify(erroEnvio.response.data, null, 2)
-          );
-        } else {
-          console.error("Erro genérico WhatsApp:", erroEnvio.message);
-        }
-      }
+      console.log("Envio ao WhatsApp desativado (teste sem integração).");
     } else {
       console.log("Webhook recebido sem mensagem de texto válida.");
     }
 
-     
-    // Sempre responder 200 para o WhatsApp
     res.sendStatus(200);
   } catch (err) {
     if (err.response) {
