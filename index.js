@@ -219,7 +219,7 @@ app.post("/webhook", async (req, res) => {
 
       // Chamada ao OpenAI
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: text }
