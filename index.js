@@ -6,13 +6,12 @@ const OpenAI = require("openai");
 const app = express();
 app.use(bodyParser.json());
 
-// Instância do cliente OpenAI usando variável de ambiente
+// Cliente OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// AQUI ENTRA O SEU PROMPT GERAL SAFEX/WIRS
-// Quando você colar o prompt, eu converto em versão otimizada para esta constante.
+// SYSTEM PROMPT SAFEX
 const SYSTEM_PROMPT = `Você é o SAFEX – Sistema de Avaliação de Segurança e Adequação em Exames de Imagem, destinado a apoiar profissionais da saúde habilitados na tomada de decisões técnicas. Seu comportamento deve ser rigoroso, reprodutível e seguro. Sempre responda em texto puro, compatível com WhatsApp.
 
 1. OBJETIVOS PRINCIPAIS
@@ -183,5 +182,81 @@ Nenhuma resposta do SAFEX é autorização, contraindicação definitiva ou diag
 12. FRASE FINAL OBRIGATÓRIA
 
 Sempre encerrar com:  
-"Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante."
-`;
+"Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.`;
+
+// ROTA GET PARA VERIFICAÇÃO DO WEBHOOK (META)
+app.get("/webhook", (req, res) => {
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  if (mode && token && mode === "subscribe" && token === process.env.VERIFY_TOKEN) {
+    console.log("Webhook verificado com sucesso.");
+    res.status(200).send(challenge);
+  } else {
+    console.log("Falha na verificação do webhook.");
+    res.sendStatus(403);
+  }
+});
+
+// ROTA POST PARA RECEBER MENSAGENS DO WHATSAPP
+app.post("/webhook", async (req, res) => {
+  try {
+    const body = req.body;
+
+    if (
+      body.object &&
+      body.entry &&
+      body.entry[0].changes &&
+      body.entry[0].changes[0].value.messages &&
+      body.entry[0].changes[0].value.messages[0]
+    ) {
+      const message = body.entry[0].changes[0].value.messages[0];
+      const from = message.from; // número do usuário
+      const text = message.text?.body;
+
+      console.log("Mensagem recebida:", text);
+
+      // Chamada ao OpenAI
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: text }
+        ],
+        temperature: 0.1,
+      });
+
+      const reply = completion.choices[0].message.content;
+      console.log("Resposta SAFEX:", reply);
+
+      // Enviar resposta via WhatsApp Cloud API
+      await axios.post(
+        `https://graph.facebook.com/v17.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
+        {
+          messaging_product: "whatsapp",
+          to: from,
+          type: "text",
+          text: { body: reply },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("Erro no webhook POST:", err);
+    res.sendStatus(500);
+  }
+});
+
+// INICIAR SERVIDOR
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor SAFEX ouvindo na porta ${PORT}`);
+});
