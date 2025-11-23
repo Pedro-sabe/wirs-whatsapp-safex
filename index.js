@@ -204,6 +204,7 @@ app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
 
+    // Verifica se há mensagem de texto válida na estrutura do WhatsApp
     if (
       body.object &&
       body.entry &&
@@ -212,27 +213,27 @@ app.post("/webhook", async (req, res) => {
       body.entry[0].changes[0].value.messages[0]
     ) {
       const message = body.entry[0].changes[0].value.messages[0];
-      const from = message.from; // número do usuário
-      const text = message.text?.body;
+      const from = message.from;                // número do usuário
+      const text = message.text?.body || "";    // texto da mensagem
 
       console.log("Mensagem recebida:", text);
 
-      // Chamada ao OpenAI
+      // Chamada ao OpenAI (SAFEX)
       const completion = await openai.chat.completions.create({
         model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: text }
+          { role: "user", content: text },
         ],
         temperature: 0.1,
       });
 
-      const reply = completion.choices[0].message.content;
+      const reply = (completion.choices[0].message.content || "").trim();
       console.log("Resposta SAFEX:", reply);
 
       // Enviar resposta via WhatsApp Cloud API
       await axios.post(
-        `https://graph.facebook.com/v17.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
+        `https://graph.facebook.com/v20.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
         {
           messaging_product: "whatsapp",
           to: from,
@@ -246,11 +247,24 @@ app.post("/webhook", async (req, res) => {
           },
         }
       );
+
+      console.log("Mensagem enviada para o WhatsApp com sucesso.");
+    } else {
+      console.log("Webhook recebido sem mensagem de texto válida.");
     }
 
+    // Sempre responder 200 para o WhatsApp
     res.sendStatus(200);
   } catch (err) {
-    console.error("Erro no webhook POST:", err);
+    if (err.response) {
+      console.error(
+        "Erro no webhook POST:",
+        err.response.status,
+        JSON.stringify(err.response.data, null, 2)
+      );
+    } else {
+      console.error("Erro no webhook POST:", err.message);
+    }
     res.sendStatus(500);
   }
 });
@@ -258,5 +272,5 @@ app.post("/webhook", async (req, res) => {
 // INICIAR SERVIDOR
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor SAFEX ouvindo na porta ${PORT}`);
+  console.log(`SAFEX vivo na porta ${PORT}`);
 });
