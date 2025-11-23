@@ -184,6 +184,16 @@ Nenhuma resposta do SAFEX é autorização, contraindicação definitiva ou diag
 Sempre encerrar com:  
 Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.`;
 
+// ROTA RAIZ (TESTE RÁPIDO)
+app.get("/", (req, res) => {
+  res.status(200).send("SAFEX raiz OK");
+});
+
+// ROTA DE HEALTHCHECK
+app.get("/health", (req, res) => {
+  res.status(200).send("SAFEX OK");
+});
+
 // ROTA GET PARA VERIFICAÇÃO DO WEBHOOK (META)
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
@@ -229,9 +239,9 @@ app.post("/webhook", async (req, res) => {
       const reply = (completion.choices[0].message.content || "").trim();
       console.log("Resposta SAFEX:", reply);
 
-      // // Enviar resposta via WhatsApp Cloud API (temporariamente desativado para teste)
+      // Enviar resposta via WhatsApp Cloud API (temporariamente desativado para teste)
       // await axios.post(
-      //  `https://graph.facebook.com/v24.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
+      //   `https://graph.facebook.com/v24.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
       //   {
       //     messaging_product: "whatsapp",
       //     to: from,
@@ -271,3 +281,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`SAFEX vivo na porta ${PORT}`);
 });
+
