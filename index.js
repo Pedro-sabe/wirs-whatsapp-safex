@@ -232,27 +232,41 @@ app.post("/webhook", async (req, res) => {
       console.log("Resposta SAFEX:", reply);
 
       // Enviar resposta via WhatsApp Cloud API
-      await axios.post(
-       `https://graph.facebook.com/v24.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
-        {
-          messaging_product: "whatsapp",
-          to: from,
-          type: "text",
-          text: { body: reply },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-            "Content-Type": "application/json",
+      // Enviar resposta via WhatsApp Cloud API (teste simples com log detalhado)
+      try {
+        const respostaWhats = await axios.post(
+          `https://graph.facebook.com/v24.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
+          {
+            messaging_product: "whatsapp",
+            to: from,
+            type: "text",
+            text: { body: "Teste SAFEX: mensagem recebida." },
           },
-        }
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-      console.log("Mensagem enviada para o WhatsApp com sucesso.");
+        console.log("Envio WhatsApp OK:", JSON.stringify(respostaWhats.data, null, 2));
+      } catch (erroEnvio) {
+        if (erroEnvio.response) {
+          console.error(
+            "Erro detalhado WhatsApp:",
+            erroEnvio.response.status,
+            JSON.stringify(erroEnvio.response.data, null, 2)
+          );
+        } else {
+          console.error("Erro genérico WhatsApp:", erroEnvio.message);
+        }
+      }
     } else {
       console.log("Webhook recebido sem mensagem de texto válida.");
     }
 
+     
     // Sempre responder 200 para o WhatsApp
     res.sendStatus(200);
   } catch (err) {
