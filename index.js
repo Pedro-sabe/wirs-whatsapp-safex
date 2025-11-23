@@ -39,7 +39,7 @@ Basear decisões nas diretrizes consolidadas de:
 - AAPM
 - ICRP
 
-Essas instituições podem ser citadas somente pelo nome institucional, sem mencionar arquivos, PDFs, versões, URLs, páginas ou dados internos. Em cada resposta, se necessário, citar apenas uma referência institucional simples (ex.: “Referência principal: ACR.”).
+Essas instituições podem ser citadas somente pelo nome institucional, sem mencionar arquivos, PDFs, versões, URLs, páginas ou dados internos. Em cada resposta, se necessário, citar apenas uma referência institucional simples (ex.: "Referência principal: ACR.").
 
 3. COMPORTAMENTO PADRÃO
 
@@ -99,7 +99,7 @@ Se faltar algum dado essencial para uma conclusão segura, solicitar de forma di
 6. FORMATOS DE SAÍDA
 
 6.1 Indicação de Exame
-Usar quando a dúvida for “qual exame”, “melhor exame”, “exame inicial”, etc.
+Usar quando a dúvida for "qual exame", "melhor exame", "exame inicial", etc.
 
 *Recomendação de Exame de Imagem*
 
@@ -146,8 +146,8 @@ Análise baseada em diretrizes vigentes. Requer validação do radiologista resp
 
 7. DETECÇÃO AUTOMÁTICA DO MODO
 
-- Se a pergunta envolver “qual exame”, “método ideal”, “exame inicial”, usar Indicação de Exame.
-- Se envolver “é seguro?”, “contraste”, “creatinina”, “função renal”, “implant”, “radiação”, usar Avaliação de Segurança.
+- Se a pergunta envolver "qual exame", "método ideal", "exame inicial", usar Indicação de Exame.
+- Se envolver "é seguro?", "contraste", "creatinina", "função renal", "implant", "radiação", usar Avaliação de Segurança.
 
 8. FORMATO PARA WHATSAPP
 
@@ -182,7 +182,7 @@ Nenhuma resposta do SAFEX é autorização, contraindicação definitiva ou diag
 12. FRASE FINAL OBRIGATÓRIA
 
 Sempre encerrar com:  
-"Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.`;
+Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.`;
 
 // ROTA GET PARA VERIFICAÇÃO DO WEBHOOK (META)
 app.get("/webhook", (req, res) => {
@@ -213,8 +213,8 @@ app.post("/webhook", async (req, res) => {
       body.entry[0].changes[0].value.messages[0]
     ) {
       const message = body.entry[0].changes[0].value.messages[0];
-      const from = message.from;                // número do usuário
-      const text = message.text?.body || "";    // texto da mensagem
+      const from = message.from;             // número do usuário
+      const text = message.text?.body || ""; // texto da mensagem
 
       console.log("Mensagem recebida:", text);
 
