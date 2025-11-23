@@ -283,21 +283,22 @@ app.post("/webhook", async (req, res) => {
 
       // Enviar resposta via WhatsApp Cloud API
       try {
-        await axios.post(
-          `https://graph.facebook.com/v21.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
-          {
-            messaging_product: "whatsapp",
-            to: from,
-            type: "text",
-            text: { body: reply },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+       await axios.post(
+  `https://graph.facebook.com/v21.0/${process.env.PHONE_NUMBER_ID}/messages`,
+  {
+    messaging_product: "whatsapp",
+    to: from,
+    type: "text",
+    text: { body: reply },
+  },
+  {
+    headers: {
+      Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+  }
+);
+
 
         console.log("Mensagem enviada ao WhatsApp com sucesso.");
       } catch (waErr) {
