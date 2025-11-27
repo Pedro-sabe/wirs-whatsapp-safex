@@ -505,15 +505,21 @@ async function handleSafexMessage(userId, texto) {
       }
       break;
 
-    case "FINALIZADO":
-      resposta =
-        "Atendimento pelo SAFEX finalizado. Se precisar novamente, envie uma nova mensagem para iniciar outro atendimento.";
-      break;
+        case "FINALIZADO":
+      // Reinicia a sessão para um novo atendimento assim que o usuário enviar qualquer nova mensagem
+      session.estado = "INICIAL";
+      session.primeiroNome = null;
+      session.email = null;
+      session.perfil = null;
+      session.historicoLLM = [];
+      session.sessaoAtiva = true;
+      session.feedback = null;
 
-    default:
+      // Envia novamente a mensagem inicial de consentimento
       resposta = mensagemInicialConsentimento();
       session.estado = "CONSENTIMENTO";
       break;
+
   }
 
   saveSession(userId, session);
