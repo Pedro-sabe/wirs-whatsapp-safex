@@ -14,7 +14,7 @@ const openai = new OpenAI({
 });
 
 // -----------------------------------------------------------------------------
-// SYSTEM PROMPT SAFEX
+// SYSTEM PROMPT SAFEX (mantido)
 // -----------------------------------------------------------------------------
 const SYSTEM_PROMPT = `Você é o SAFEX – Sistema de Avaliação de Segurança e Adequação em Exames de Imagem, destinado a apoiar profissionais da saúde habilitados na tomada de decisões técnicas. Seu comportamento deve ser rigoroso, reprodutível e seguro. Sempre responda em texto puro, compatível com WhatsApp.
 
@@ -189,6 +189,338 @@ Sempre encerrar com:
 Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.`;
 
 // -----------------------------------------------------------------------------
+// ESTADOS DE SESSÃO SAFEX (memória em RAM)
+// -----------------------------------------------------------------------------
+const sessions = new Map();
+
+function getSession(userId) {
+  if (!sessions.has(userId)) {
+    sessions.set(userId, {
+      estado: "INICIAL",
+      primeiroNome: null,
+      email: null,
+      perfil: null, // "MEDICO" | "PROF_SAUDE" | "OUTROS"
+      historicoLLM: [],
+      sessaoAtiva: true,
+      feedback: null,
+    });
+  }
+  return sessions.get(userId);
+}
+
+function saveSession(userId, session) {
+  sessions.set(userId, session);
+}
+
+// -----------------------------------------------------------------------------
+// Serviço contratado (exemplo – ajuste com seus dados reais)
+// -----------------------------------------------------------------------------
+const SERVICO_CONTRATADO = {
+  nome: "Serviço de Imagem Contratado",
+  whatsapp: "5511912345678",
+  linkWhatsapp: "https://wa.me/5511912345678",
+  linkAgendamento: "https://agenda.seuservico.com",
+};
+
+// -----------------------------------------------------------------------------
+// Funções de mensagens fixas do fluxo
+// -----------------------------------------------------------------------------
+function mensagemInicialConsentimento() {
+  return (
+    "Olá, sou o SAFEX — Assistente de apoio à decisão em exames por imagem.\n\n" +
+    "Este canal oferece orientações gerais sobre:\n" +
+    "• Qual exame de imagem pode ser mais adequado em diferentes situações clínicas.\n" +
+    "• Questões de segurança em exames de imagem (RM, TC, RX, USG, etc.).\n\n" +
+    "Importante:\n" +
+    "• Não substitui consulta médica presencial.\n" +
+    "• Não deve ser usado em casos de urgência ou emergência.\n" +
+    "• Em situações graves, procure imediatamente um serviço de emergência.\n\n" +
+    "Aviso de privacidade:\n" +
+    "• Não envie documentos, fotos, laudos, imagens de exames ou outros arquivos.\n" +
+    "• Não envie nome completo, CPF, RG, endereço, número de prontuário ou qualquer dado que identifique pacientes.\n\n" +
+    "Você concorda em seguir com o atendimento pelo SAFEX?\n" +
+    "1 – Sim, concordo\n" +
+    "2 – Não concordo"
+  );
+}
+
+function mensagemRecusaConsentimento() {
+  return (
+    "Entendido. Sem o seu consentimento não posso seguir com o atendimento pelo SAFEX.\n" +
+    "Em caso de dúvida específica, procure diretamente o serviço de imagem ou o médico assistente."
+  );
+}
+
+function mensagemPedirPrimeiroNome() {
+  return "Obrigado.\n\nPara personalizar o atendimento, informe apenas o seu primeiro nome (sem sobrenome).";
+}
+
+function mensagemPedirEmail(nome) {
+  return (
+    `Obrigado, ${nome}.\n\n` +
+    "Informe um e-mail de contato (será utilizado apenas para retorno profissional, se necessário)."
+  );
+}
+
+function mensagemPerguntarPerfil(nome) {
+  return (
+    `Obrigado, ${nome}.\n\n` +
+    "Selecione a opção que melhor descreve você:\n" +
+    "1 – Médico(a)\n" +
+    "2 – Profissional de saúde (enfermeiro, tecnólogo, fisioterapeuta, etc.)\n" +
+    "3 – Outros (paciente, familiar, estudante, outras áreas)"
+  );
+}
+
+function mensagemColetaDuvida(nome, perfil) {
+  if (perfil === "MEDICO") {
+    return (
+      `Obrigado, Dr(a). ${nome}.\n\n` +
+      "Para eu auxiliar com orientações gerais sobre o melhor exame e segurança em exames de imagem, informe, sem identificar o paciente:\n\n" +
+      "• Situação clínica principal ou hipótese diagnóstica.\n" +
+      "• Exame(s) de imagem já cogitado(s) ou solicitado(s).\n" +
+      "• Condições relevantes (implantes, marca-passo, próteses, gestação, alergia a contraste, DRC, etc.).\n\n" +
+      "Responda em uma única mensagem, sem nome completo, CPF ou outros identificadores."
+    );
+  } else if (perfil === "PROF_SAUDE") {
+    return (
+      `Obrigado, ${nome}.\n\n` +
+      "Para eu auxiliar com orientações gerais sobre melhor exame e segurança em exames, informe, sem identificar o paciente:\n\n" +
+      "• Situação clínica ou motivo principal do exame.\n" +
+      "• Exame de imagem cogitado (RM, TC, RX, USG etc.).\n" +
+      "• Condições relevantes (dispositivos, próteses, risco de queda, gestação, alergias importantes, etc.).\n\n" +
+      "Responda em uma única mensagem, sem nome completo, CPF ou outros identificadores."
+    );
+  } else {
+    return (
+      `Obrigado, ${nome}.\n\n` +
+      "Para tentar ajudar com orientações gerais sobre o exame de imagem mais adequado e segurança, informe:\n\n" +
+      "• Idade aproximada da pessoa (ex.: 40 anos).\n" +
+      "• Motivo principal da investigação (ex.: dor lombar, cefaleia, trauma, etc.).\n" +
+      "• Se há algum exame de imagem já cogitado (RM, TC, RX, USG etc.).\n" +
+      "• Condições importantes (implantes, próteses, marca-passo, gestação, alergias importantes).\n\n" +
+      "Lembre-se: não envie nome completo, CPF ou qualquer dado que identifique o paciente."
+    );
+  }
+}
+
+function mensagemPosPerguntaMaisDuvida() {
+  return (
+    "\n\nPosso ajudar com mais alguma dúvida sobre este caso ou outro exame de imagem?\n" +
+    "1 – Sim, tenho outra dúvida\n" +
+    "2 – Não, pode finalizar o atendimento"
+  );
+}
+
+function mensagemSolicitarNovaPergunta(nome) {
+  return (
+    `Perfeito, ${nome}.\n\n` +
+    "Pode enviar sua próxima dúvida, lembrando de não incluir nome completo, CPF ou documentos."
+  );
+}
+
+function mensagemEncerramento(nome) {
+  return (
+    `Agradeço o seu contato, ${nome}.\n\n` +
+    "O SAFEX permanece disponível para dúvidas gerais sobre escolha de exames de imagem e segurança em exames.\n" +
+    "Em situações específicas ou complexas, é sempre recomendada discussão direta com o radiologista e com o médico assistente.\n\n" +
+    "Antes de encerrar, poderia avaliar se este atendimento foi útil para você?\n\n" +
+    "De 1 a 4, como você avalia o atendimento:\n" +
+    "1 – Não foi útil\n" +
+    "2 – Ajudou pouco\n" +
+    "3 – Ajudou\n" +
+    "4 – Ajudou muito"
+  );
+}
+
+function mensagemAgradecerFeedback() {
+  return "Obrigado pelo seu feedback. Ele ajuda a melhorar continuamente o SAFEX.";
+}
+
+function mensagemNaoEntendiOpcao12() {
+  return "Não entendi a opção. Por favor, responda com 1 ou 2.";
+}
+
+function mensagemNaoEntendiOpcao14() {
+  return "Não entendi a opção. Por favor, responda com um número de 1 a 4.";
+}
+
+function mensagemSomenteTexto() {
+  return "No momento, o SAFEX só consegue processar mensagens de texto. Por favor, envie sua dúvida em texto.";
+}
+
+// -----------------------------------------------------------------------------
+// Bloco de serviço contratado / radiologista / agendamento
+// -----------------------------------------------------------------------------
+function montarBlocoServico(session) {
+  // Regra simples: oferecer mais para médico e profissional de saúde.
+  if (session.perfil === "MEDICO" || session.perfil === "PROF_SAUDE") {
+    return (
+      "\n\nPara casos que necessitam avaliação individualizada, recomenda-se contato direto com o serviço de imagem contratado:\n\n" +
+      `• Serviço: ${SERVICO_CONTRATADO.nome}\n` +
+      `• WhatsApp profissional: ${SERVICO_CONTRATADO.whatsapp}\n` +
+      `• Link direto: ${SERVICO_CONTRATADO.linkWhatsapp}\n` +
+      `• Agendamento: ${SERVICO_CONTRATADO.linkAgendamento}\n\n` +
+      "Ao entrar em contato, evite enviar nome completo, CPF ou documentos. Utilize, se possível, o número interno do exame ou prontuário informado pelo serviço."
+    );
+  }
+  return "";
+}
+
+// -----------------------------------------------------------------------------
+// Função utilitária: chamar SAFEX (OpenAI) com contexto de sessão
+// -----------------------------------------------------------------------------
+async function chamarSafex(session, texto) {
+  const historico = session.historicoLLM || [];
+
+  const messages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...historico,
+    {
+      role: "user",
+      content: texto,
+    },
+  ];
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4.1-mini",
+    messages,
+    temperature: 0.1,
+  });
+
+  const resposta = (completion.choices[0].message.content || "").trim();
+
+  // Atualiza histórico simples
+  session.historicoLLM = [
+    ...historico,
+    { role: "user", content: texto },
+    { role: "assistant", content: resposta },
+  ];
+
+  return resposta;
+}
+
+// -----------------------------------------------------------------------------
+// Orquestrador SAFEX por estado (usado pelo webhook do WhatsApp)
+// -----------------------------------------------------------------------------
+async function handleSafexMessage(userId, texto) {
+  const session = getSession(userId);
+  const entrada = (texto || "").trim();
+  let resposta = "";
+
+  switch (session.estado) {
+    case "INICIAL":
+      resposta = mensagemInicialConsentimento();
+      session.estado = "CONSENTIMENTO";
+      break;
+
+    case "CONSENTIMENTO":
+      if (entrada === "1") {
+        resposta = mensagemPedirPrimeiroNome();
+        session.estado = "PRIMEIRO_NOME";
+      } else if (entrada === "2") {
+        resposta = mensagemRecusaConsentimento();
+        session.estado = "FINALIZADO";
+        session.sessaoAtiva = false;
+      } else {
+        resposta = "Por favor, responda com 1 (Sim, concordo) ou 2 (Não concordo).";
+      }
+      break;
+
+    case "PRIMEIRO_NOME": {
+      const primeiroNome = entrada.split(" ")[0];
+      session.primeiroNome = primeiroNome || "Colega";
+      resposta = mensagemPedirEmail(session.primeiroNome);
+      session.estado = "EMAIL";
+      break;
+    }
+
+    case "EMAIL":
+      session.email = entrada;
+      resposta = mensagemPerguntarPerfil(session.primeiroNome);
+      session.estado = "PERFIL";
+      break;
+
+    case "PERFIL":
+      if (entrada === "1") {
+        session.perfil = "MEDICO";
+      } else if (entrada === "2") {
+        session.perfil = "PROF_SAUDE";
+      } else if (entrada === "3") {
+        session.perfil = "OUTROS";
+      } else {
+        resposta = "Por favor, responda com 1, 2 ou 3.";
+        break;
+      }
+      resposta = mensagemColetaDuvida(session.primeiroNome, session.perfil);
+      session.estado = "COLETA_DUVIDA";
+      break;
+
+    case "COLETA_DUVIDA":
+      // Primeira dúvida: chama SAFEX
+      if (!entrada) {
+        resposta = "Por favor, descreva a situação clínica ou dúvida em texto.";
+        break;
+      }
+      {
+        const respostaSafex = await chamarSafex(session, entrada);
+        resposta = respostaSafex + montarBlocoServico(session) + mensagemPosPerguntaMaisDuvida();
+        session.estado = "PERGUNTA_NOVA_OU_ENCERRA";
+      }
+      break;
+
+    case "DIALOGO_ATIVO":
+      // Novas dúvidas, mesma sessão
+      if (!entrada) {
+        resposta = "Por favor, envie sua dúvida em texto.";
+        break;
+      }
+      {
+        const respostaSafexNova = await chamarSafex(session, entrada);
+        resposta = respostaSafexNova + montarBlocoServico(session) + mensagemPosPerguntaMaisDuvida();
+        session.estado = "PERGUNTA_NOVA_OU_ENCERRA";
+      }
+      break;
+
+    case "PERGUNTA_NOVA_OU_ENCERRA":
+      if (entrada === "1") {
+        resposta = mensagemSolicitarNovaPergunta(session.primeiroNome);
+        session.estado = "DIALOGO_ATIVO";
+      } else if (entrada === "2") {
+        resposta = mensagemEncerramento(session.primeiroNome);
+        session.estado = "FEEDBACK";
+      } else {
+        resposta = mensagemNaoEntendiOpcao12();
+      }
+      break;
+
+    case "FEEDBACK":
+      if (["1", "2", "3", "4"].includes(entrada)) {
+        session.feedback = entrada;
+        resposta = mensagemAgradecerFeedback();
+        session.estado = "FINALIZADO";
+        session.sessaoAtiva = false;
+      } else {
+        resposta = mensagemNaoEntendiOpcao14();
+      }
+      break;
+
+    case "FINALIZADO":
+      resposta =
+        "Atendimento pelo SAFEX finalizado. Se precisar novamente, envie uma nova mensagem para iniciar outro atendimento.";
+      break;
+
+    default:
+      resposta = mensagemInicialConsentimento();
+      session.estado = "CONSENTIMENTO";
+      break;
+  }
+
+  saveSession(userId, session);
+  return resposta;
+}
+
+// -----------------------------------------------------------------------------
 // Rotas básicas de teste
 // -----------------------------------------------------------------------------
 app.get("/", (req, res) => {
@@ -199,7 +531,7 @@ app.get("/health", (req, res) => {
   res.status(200).send("SAFEX OK");
 });
 
-// Rota de teste direto do SAFEX (sem WhatsApp)
+// Rota de teste direto do SAFEX (sem WhatsApp) – mantida
 app.get("/test-safex", async (req, res) => {
   try {
     const completion = await openai.chat.completions.create({
@@ -240,29 +572,12 @@ app.get("/webhook", (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// Função utilitária: chamar SAFEX (OpenAI) com texto do usuário
-// -----------------------------------------------------------------------------
-async function chamarSafex(texto) {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: texto },
-    ],
-    temperature: 0.1,
-  });
-
-  return (completion.choices[0].message.content || "").trim();
-}
-
-// -----------------------------------------------------------------------------
 // ROTA POST PARA RECEBER MENSAGENS DO WHATSAPP
 // -----------------------------------------------------------------------------
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
 
-    // Verificação mínima de estrutura
     if (
       body.object &&
       body.entry &&
@@ -277,28 +592,32 @@ app.post("/webhook", async (req, res) => {
 
       console.log("Mensagem recebida do WhatsApp:", text);
 
-      // Chamar SAFEX
-      const reply = await chamarSafex(text);
+      let reply;
+      if (!text) {
+        reply = mensagemSomenteTexto();
+      } else {
+        // Aqui entra o fluxo SAFEX com estados
+        reply = await handleSafexMessage(from, text);
+      }
+
       console.log("Resposta SAFEX:", reply);
 
-      // Enviar resposta via WhatsApp Cloud API
       try {
-       await axios.post(
-  `https://graph.facebook.com/v21.0/${process.env.PHONE_NUMBER_ID}/messages`,
-  {
-    messaging_product: "whatsapp",
-    to: from,
-    type: "text",
-    text: { body: reply },
-  },
-  {
-    headers: {
-      Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-  }
-);
-
+        await axios.post(
+          `https://graph.facebook.com/v21.0/${process.env.PHONE_NUMBER_ID}/messages`,
+          {
+            messaging_product: "whatsapp",
+            to: from,
+            type: "text",
+            text: { body: reply },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
         console.log("Mensagem enviada ao WhatsApp com sucesso.");
       } catch (waErr) {
@@ -312,7 +631,6 @@ app.post("/webhook", async (req, res) => {
       console.log("Webhook recebido sem mensagem de texto válida.");
     }
 
-    // O WhatsApp exige resposta 200 mesmo em caso de erro interno
     res.sendStatus(200);
   } catch (err) {
     if (err.response) {
@@ -328,6 +646,9 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+// -----------------------------------------------------------------------------
+// INICIAR SERVIDOR
+// -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
 // INICIAR SERVIDOR
 // -----------------------------------------------------------------------------

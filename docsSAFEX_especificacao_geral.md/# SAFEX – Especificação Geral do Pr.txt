@@ -1,0 +1,111 @@
+# SAFEX – Especificação Geral do Projeto
+
+## 1. Visão Geral
+
+**Nome:** SAFEX – Sistema de Avaliação de Segurança e Adequação em Exames de Imagem  
+**Objetivo principal:**  
+Apoiar profissionais de saúde na escolha do exame de imagem mais adequado e na avaliação de segurança (contraste, função renal, radiação, implantes, gestação, pediatria etc.), com foco em:
+
+- Orientações gerais sobre o exame mais apropriado para o diagnóstico.  
+- Orientações gerais sobre segurança em exames de imagem.  
+- Encaminhamento para serviço contratado / radiologista quando a dúvida ultrapassar o escopo do assistente.  
+
+O SAFEX:
+
+- Não substitui consulta médica.  
+- Não realiza ato médico.  
+- Não autoriza nem contraindica definitivamente exames.  
+- Exige validação pelo radiologista responsável e pelo médico assistente.  
+
+---
+
+## 2. Arquitetura Técnica
+
+Componentes principais:
+
+1. **Entrada / saída:** WhatsApp Cloud API (Meta).  
+2. **Backend:** Node.js (Express), hospedado no Render.  
+3. **Inteligência:** OpenAI (modelo `gpt-4.1-mini`), via SDK `openai`.  
+4. **Código-fonte:** repositório Git (GitHub / GitLab / outro).  
+5. **Estado de sessão:** inicialmente em memória (Map em Node), com possibilidade futura de migração para Redis ou banco de dados.
+
+Fluxo simplificado:
+
+1. Usuário envia mensagem pelo WhatsApp.  
+2. Meta chama o webhook HTTP `POST /webhook`.  
+3. O backend extrai:
+   - ID do usuário (número do WhatsApp),  
+   - texto da mensagem.  
+4. O backend chama o **orquestrador do SAFEX**, que:
+   - lê o estado atual da sessão desse usuário,  
+   - decide se responde com texto fixo (consentimento, perfil, feedback etc.) ou se chama a OpenAI,  
+   - atualiza o estado da sessão.  
+5. O backend envia a resposta de volta via WhatsApp Cloud API.  
+
+---
+
+## 3. System Prompt do SAFEX
+
+O `SYSTEM_PROMPT` define o comportamento técnico do SAFEX:
+
+- Assistente de apoio à decisão em exames de imagem.  
+- Foco em:
+  - **Indicação de exame** (quando a pergunta é “qual exame…”, “exame inicial…”, “método ideal…”)  
+  - **Avaliação de segurança** (quando a pergunta é “é seguro?”, “contraste”, “creatinina”, “radiação”, “implante” etc.).  
+- Baseado em diretrizes de:
+  - ACR, ESUR, ANVISA, CBR, AAPM, ICRP (citadas apenas nominalmente).  
+- Saída em texto puro para WhatsApp, com formatação simples.  
+- Sempre encerra com a frase:  
+  `Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.`
+
+O prompt já está implementado em `index.js` como constante `SYSTEM_PROMPT`.
+
+---
+
+## 4. Regras de Privacidade e Segurança
+
+Desde a primeira mensagem, o SAFEX deve deixar claro:
+
+1. **Escopo funcional:**
+   - Orientações gerais sobre melhor exame de imagem e segurança em exames.  
+   - Não é canal de emergência.  
+   - Não substitui consulta presencial.
+
+2. **Restrições de dados:**
+   - Não enviar:
+     - nome completo,  
+     - CPF/RG,  
+     - endereço,  
+     - número de prontuário,  
+     - documentos ou fotos,  
+     - laudos ou imagens de exame (DICOM, JPEG, PDF etc.).  
+   - Sempre preferir:
+     - idade aproximada,  
+     - descrição clínica,  
+     - tipo de exame,  
+     - condições relevantes (implantes, gestação etc.),  
+     sem identificação direta do paciente.
+
+3. **Logs e armazenamento:**
+   - Sessões mantidas em memória (Map).  
+   - Possível expansão futura para banco de dados com controle de acesso e anonimização.  
+
+---
+
+## 5. Fluxo de Conversa – Máquina de Estados
+
+Cada usuário (identificado pelo número de WhatsApp) possui um estado de sessão.  
+A sessão é representada por um objeto:
+
+```js
+{
+  estado: "INICIAL" | "CONSENTIMENTO" | "PRIMEIRO_NOME" | "EMAIL" |
+          "PERFIL" | "COLETA_DUVIDA" | "DIALOGO_ATIVO" |
+          "PERGUNTA_NOVA_OU_ENCERRA" | "FEEDBACK" | "FINALIZADO",
+  primeiroNome: string | null,
+  email: string | null,
+  perfil: "MEDICO" | "PROF_SAUDE" | "OUTROS" | null,
+  historicoLLM: Array<{ role: "user"|"assistant", content: string }>,
+  sessaoAtiva: boolean,
+  feedback: "1" | "2" | "3" | "4" | null
+}
