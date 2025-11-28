@@ -1,0 +1,466 @@
+PROJETO RAG  Ótimo. Então vamos estruturar o RAG com JSON local, desde o início, já pensando em segurança e supervisão médica.
+
+A ideia é: você passa a ter uma “biblioteca SAFEX” em arquivos de texto (Markdown), gera embeddings com a OpenAI via um script, e o SAFEX passa a consultar essa biblioteca quando formos integrar o RAG ao fluxo. Por enquanto, vamos apenas:
+
+* definir a estrutura de pastas,
+* criar modelos de documentos,
+* criar o script `build_rag.js` que gera os JSON de embeddings.
+
+Nada disso altera o fluxo atual do WhatsApp. Só prepara o terreno.
+
+---
+
+## 1. Estrutura de pastas para o RAG (JSON local)
+
+Dentro do seu projeto `wirs-whatsapp-safex`, crie a seguinte estrutura:
+
+```text
+wirs-whatsapp-safex/
+  safex/
+    rag/
+      raw_documents/
+        seguranca/
+        indicacao/
+        protocolos_rm/
+        artefatos_rm/
+      embeddings/
+  scripts/
+    build_rag.js
+```
+
+Significado:
+
+* `raw_documents/`
+  Onde ficarão os textos “fonte” das suas diretrizes e protocolos (em `.md` ou `.txt`).
+
+* subpastas:
+
+  * `seguranca/` – ESUR, ACR contraste, ANVISA radiação, etc.
+  * `indicacao/` – ACR Appropriateness, CBR, fluxos de “melhor exame”.
+  * `protocolos_rm/` – protocolos internos de RM (crânio, coluna, abdome, etc.).
+  * `artefatos_rm/` – guia de artefatos de RM e ajustes técnicos.
+
+* `embeddings/`
+  Onde o script vai salvar os arquivos JSON prontos para uso pelo RAG:
+
+  * `seguranca.json`
+  * `indicacao.json`
+  * `protocolos_rm.json`
+  * `artefatos_rm.json`
+
+* `scripts/build_rag.js`
+  Script Node que:
+
+  * lê os `.md` em `raw_documents/...`,
+  * divide em pedaços,
+  * chama a OpenAI para gerar embeddings,
+  * gera um JSON por coleção em `embeddings/`.
+
+---
+
+## 2. Exemplos de arquivos de diretrizes/protocolos (modelo inicial)
+
+A ideia é ter um padrão para os seus documentos, para facilitar chunking e leitura.
+
+### 2.1. Segurança – exemplo de arquivo
+
+Crie:
+`safex/rag/raw_documents/seguranca/seguranca_contraste_renal_basico.md`
+
+Conteúdo sugerido:
+
+```markdown
+# Segurança – Contraste Iodado em Função Renal Reduzida
+Versão: 2024.1
+Autor: Pedro / WiHealth
+Modalidade: TC / RM com contraste iodado
+Categoria: Segurança
+Nível: Interno
+
+## Resumo executivo
+
+Em pacientes com eGFR < 30 mL/min/1,73m², o uso de contraste iodado intravenoso deve ser evitado, salvo situações de clara urgência diagnóstica, após avaliação risco-benefício e medidas de mitigação (hidratação, ajuste de medicação, monitorização). Para eGFR entre 30 e 44, recomenda-se avaliação individualizada e consideração de hidratação intravenosa.
+
+## Recomendações principais
+
+- eGFR < 30 mL/min/1,73m²:
+  - Evitar contraste iodado IV sempre que houver alternativa diagnóstica.
+  - Se exame for imprescindível, discutir com nefrologia e radiologia.
+  - Avaliar hidratação e monitorização pós-exame.
+
+- eGFR 30–44:
+  - Avaliação individualizada.
+  - Considerar hidratação venosa quando houver fatores de risco adicionais.
+
+- eGFR ≥ 45:
+  - Em geral, baixo risco de nefrotoxicidade associada ao contraste iodado.
+
+## Notas de segurança
+
+- Metformina: seguir recomendações institucionais de suspensão em DRC avançada.
+- Pacientes com risco adicional (diabéticos, mieloma, desidratação) exigem maior cautela.
+- Esta diretriz complementa, mas não substitui, ESUR/ACR atualizadas e protocolos locais.
+```
+
+Mais tarde, você pode ir adicionando outros arquivos de segurança (gadolínio, implantes, gestação, pediatria).
+
+---
+
+### 2.2. Indicação – exemplo de arquivo
+
+Crie:
+`safex/rag/raw_documents/indicacao/cefaleia_aguda_sem_sinais_de_alarme.md`
+
+```markdown
+# Indicação de Exame – Cefaleia aguda sem sinais de alarme
+Versão: 2024.1
+Autor: Pedro / WiHealth
+Modalidade: TC / RM
+Categoria: Indicação
+Nível: Interno
+
+## Resumo executivo
+
+Em cefaleia aguda sem sinais de alarme, em paciente jovem, sem déficit neurológico focal, febre ou imunossupressão, a probabilidade de achado relevante em neuroimagem é baixa. Em muitos casos, a investigação inicial pode ser clínica, com neuroimagem reservada para sinais de alerta.
+
+## Recomendações
+
+- Paciente < 50 anos, cefaleia aguda, exame neurológico normal, ausência de sinais de alarme:
+  - Não há obrigatoriedade imediata de TC ou RM.
+  - Considerar imagem se evolução atípica, mudança de padrão ou sinais de alarme.
+
+- Paciente com sinais de alarme (déficit focal, febre, imunossupressão, trauma, neoplasia conhecida):
+  - Considerar TC de crânio sem contraste como exame inicial em emergência.
+  - RM de crânio pode ser indicada como complemento, conforme quadro clínico.
+
+## Observações
+
+- Adaptar às diretrizes ACR/CBR e protocolos da instituição.
+- Em caso de dúvida, discutir com neurologia e radiologia.
+```
+
+---
+
+### 2.3. Protocolos de RM – exemplo
+
+Crie:
+`safex/rag/raw_documents/protocolos_rm/protocolo_rm_cranio_padrao_15T.md`
+
+```markdown
+# Protocolo RM Crânio – 1,5T – Protocolo Padrão
+Versão: 2024.1
+Autor: Pedro / WiHealth
+Modalidade: RM
+Categoria: Protocolo
+Campo: 1.5T
+
+## Sequências principais
+
+- Axial T1 SE
+- Axial T2 TSE
+- Axial FLAIR
+- Axial DWI/ADC
+- Sagital T1
+- SWI ou T2* GRE, conforme disponibilidade
+
+## Parâmetros gerais (valores aproximados)
+
+- TR: 400–700 ms (T1 SE); 4000–6000 ms (T2 TSE)
+- TE: 10–20 ms (T1); 80–100 ms (T2)
+- FOV: 220–240 mm
+- Espessura: 4–5 mm
+- Gap: 0,5–1 mm
+- Matriz: 256 × 192 (ajustar conforme SNR e tempo)
+- NEX: 1–2
+
+## Observações técnicas
+
+- Centralizar cabeça, evitar inclinação excessiva.
+- Instruir paciente a permanecer imóvel; uso de imobilização leve se necessário.
+- Em presença de suspeita de lesões pequenas corticais/subcorticais, considerar alta resolução e cortes mais finos.
+```
+
+---
+
+### 2.4. Artefatos de RM – exemplo
+
+Crie:
+`safex/rag/raw_documents/artefatos_rm/artefato_movimento_cranio.md`
+
+```markdown
+# Artefato de movimento – RM Crânio
+Versão: 2024.1
+Autor: Pedro / WiHealth
+Modalidade: RM
+Categoria: Artefato
+
+## Descrição
+
+Artefato de borramento ou ghosting em direção da codificação de fase em sequências de RM de crânio, relacionado ao movimento do paciente (voluntário ou involuntário).
+
+## Causas frequentes
+
+- Paciente ansioso ou claustrofóbico.
+- Paciente pediátrico sem sedação adequada.
+- Dor intensa e dificuldade de permanecer imóvel.
+
+## Estratégias gerais de correção
+
+- Orientar paciente, reforçando importância de não se mexer.
+- Utilizar imobilização de cabeça.
+- Reduzir tempo total de exame (protocolos abreviados).
+- Preferir sequências mais rápidas (TSE, EPI, etc.).
+- Aumentar NEX em sequências críticas (com custo em tempo).
+- Ajustar FOV e matriz para equilíbrio entre resolução e tempo.
+
+## Notas técnicas
+
+- Em 3T, artefatos de movimento podem ser mais evidentes.
+- Em casos extremos, considerar sedação em ambiente controlado, conforme protocolo institucional.
+```
+
+Estes são apenas modelos. O importante é ter **estrutura coerente**.
+
+---
+
+## 3. Script `build_rag.js` para gerar embeddings em JSON
+
+Agora o script que:
+
+* lê os `.md` em `raw_documents/<coleção>/`,
+* gera embeddings com a OpenAI,
+* escreve `embeddings/<coleção>.json`.
+
+Crie o arquivo:
+`scripts/build_rag.js`
+com o conteúdo abaixo:
+
+```js
+// scripts/build_rag.js
+// Gera arquivos de embeddings em JSON para uso pelo SAFEX (RAG com JSON local)
+
+const fs = require("fs");
+const path = require("path");
+const OpenAI = require("openai");
+
+// Se você já estiver usando dotenv no projeto, pode habilitar aqui:
+// require("dotenv").config();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Diretórios base
+const RAG_BASE_DIR = path.join(__dirname, "..", "safex", "rag");
+const RAW_DIR = path.join(RAG_BASE_DIR, "raw_documents");
+const EMBEDDINGS_DIR = path.join(RAG_BASE_DIR, "embeddings");
+
+// Modelo de embedding da OpenAI
+const EMBEDDING_MODEL = "text-embedding-3-small";
+
+// Garante que a pasta de embeddings existe
+if (!fs.existsSync(EMBEDDINGS_DIR)) {
+  fs.mkdirSync(EMBEDDINGS_DIR, { recursive: true });
+}
+
+// Função simples de chunking (divide texto em blocos de até ~1200 caracteres)
+function chunkText(text, maxChars = 1200) {
+  const chunks = [];
+  let current = "";
+
+  const paragraphs = text.split(/\n\s*\n/); // quebra por parágrafos
+
+  for (const p of paragraphs) {
+    if ((current + "\n\n" + p).length > maxChars && current !== "") {
+      chunks.push(current.trim());
+      current = p;
+    } else {
+      current = current ? current + "\n\n" + p : p;
+    }
+  }
+
+  if (current.trim()) {
+    chunks.push(current.trim());
+  }
+
+  return chunks;
+}
+
+// Lê todos os arquivos .md de uma coleção
+function getFilesForCollection(collectionName) {
+  const dir = path.join(RAW_DIR, collectionName);
+
+  if (!fs.existsSync(dir)) {
+    console.warn(`Coleção ${collectionName} não encontrada em ${dir}. Pulando.`);
+    return [];
+  }
+
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md") || f.endsWith(".txt"));
+  return files.map((file) => path.join(dir, file));
+}
+
+// Gera embeddings para uma coleção específica
+async function buildCollection(collectionName) {
+  console.log(`\n=== Construindo coleção: ${collectionName} ===`);
+
+  const files = getFilesForCollection(collectionName);
+  if (files.length === 0) {
+    console.warn(`Nenhum arquivo encontrado para coleção ${collectionName}.`);
+    return;
+  }
+
+  const allChunks = [];
+
+  for (const filePath of files) {
+    const rawText = fs.readFileSync(filePath, "utf-8");
+    const chunks = chunkText(rawText);
+
+    const fileName = path.basename(filePath);
+
+    console.log(`  Arquivo: ${fileName} -> ${chunks.length} chunk(s)`);
+
+    // Para cada chunk, gerar embedding
+    for (let i = 0; i < chunks.length; i++) {
+      const chunkTextContent = chunks[i];
+
+      // Chamada à OpenAI para gerar embedding
+      const response = await openai.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: chunkTextContent,
+      });
+
+      const embedding = response.data[0].embedding;
+
+      allChunks.push({
+        id: `${collectionName}:${fileName}:${i}`,
+        collection: collectionName,
+        source_file: fileName,
+        chunk_index: i,
+        text: chunkTextContent,
+        embedding,
+        metadata: {
+          created_at: new Date().toISOString(),
+        },
+      });
+    }
+  }
+
+  const output = {
+    collection: collectionName,
+    model: EMBEDDING_MODEL,
+    created_at: new Date().toISOString(),
+    chunks: allChunks,
+  };
+
+  const outPath = path.join(EMBEDDINGS_DIR, `${collectionName}.json`);
+  fs.writeFileSync(outPath, JSON.stringify(output, null, 2), "utf-8");
+  console.log(`>>> Coleção ${collectionName} salva em ${outPath} (${allChunks.length} chunks).`);
+}
+
+// Ponto de entrada do script
+async function main() {
+  // Se você quiser passar a coleção via linha de comando:
+  // node scripts/build_rag.js seguranca
+  const args = process.argv.slice(2);
+  let collectionsToBuild = [];
+
+  if (args.length > 0) {
+    collectionsToBuild = args;
+  } else {
+    // Se não passar nada, gera todas as coleções padrão
+    collectionsToBuild = ["seguranca", "indicacao", "protocolos_rm", "artefatos_rm"];
+  }
+
+  console.log("Iniciando geração de embeddings para coleções:", collectionsToBuild.join(", "));
+
+  for (const col of collectionsToBuild) {
+    try {
+      await buildCollection(col);
+    } catch (err) {
+      console.error(`Erro ao construir coleção ${col}:`, err.message);
+    }
+  }
+
+  console.log("\nProcesso concluído.");
+}
+
+main().catch((err) => {
+  console.error("Erro geral no build_rag:", err);
+});
+```
+
+---
+
+## 4. Como executar o script de RAG
+
+Pré-requisitos:
+
+* Ter `OPENAI_API_KEY` definido (como você já fez para o `index.js`).
+
+No terminal, na pasta do projeto:
+
+```bat
+cd "C:\Users\psabe\OneDrive\Documents\wirs-whatsapp-safex"
+
+set OPENAI_API_KEY=SUA_CHAVE_AQUI
+
+node scripts/build_rag.js seguranca
+```
+
+Isso irá:
+
+* ler os arquivos `.md` em `safex/rag/raw_documents/seguranca/`,
+* gerar embeddings,
+* salvar em:
+  `safex/rag/embeddings/seguranca.json`.
+
+Se quiser gerar tudo de uma vez:
+
+```bat
+node scripts/build_rag.js
+```
+
+Ele vai tentar construir:
+
+* `seguranca`
+* `indicacao`
+* `protocolos_rm`
+* `artefatos_rm`
+
+(conforme as pastas e arquivos que existirem).
+
+---
+
+## 5. Integração com o SAFEX (próximo passo, quando você desejar)
+
+Por enquanto, **não integramos isso no `index.js`**.
+O fluxo do WhatsApp continua como está.
+
+Quando você quiser dar o próximo passo, faremos assim:
+
+1. Criar um pequeno módulo, por exemplo `safex/rag/rag_query.js`, que:
+
+   * lê `embeddings/seguranca.json` (e outros),
+   * recebe uma pergunta,
+   * calcula similaridade (cosine) entre embedding da pergunta e cada chunk,
+   * retorna os N melhores trechos.
+
+2. Dentro de `chamarSafex(session, texto)`:
+
+   * antes de chamar `openai.chat.completions.create`,
+   * buscar trechos relevantes no RAG (ex.: se perfil = médico + tema = segurança → coleção `seguranca`),
+   * inserir esses trechos como mensagens `system` ou `assistant` com papel de “contexto técnico”.
+
+3. O modelo passa a responder usando:
+
+   * o que ele já sabe,
+   * mais o que você colocou nos seus documentos.
+
+Mas isso pode esperar. Você já está com:
+
+* fluxo conversacional ajustado,
+* RAG estruturado no projeto,
+* script para gerar a base JSON,
+* caminho claro para integração futura.
+
+Quando terminar de testar a lógica atual e quiser começar a usar os conteúdos de segurança/indicação/artefatos/protocolos no SAFEX, podemos então escrever o módulo de consulta RAG (`rag_query.js`) e a integração no `index.js`.

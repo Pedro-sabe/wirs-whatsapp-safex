@@ -1,0 +1,300 @@
+Excelente. Enquanto você testa a lógica atual no WhatsApp, eu vou estruturar para você **toda a arquitetura profissional do RAG**, já planejada para:
+
+* múltiplos produtos SAFEX,
+* várias coleções de conhecimento,
+* expansão futura para protocolos, artefatos, diretrizes, ensino, etc.
+
+Você poderá simplesmente seguir essa estrutura quando estiver pronto para implementar.
+
+---
+
+# ✔ 1. Estrutura de Diretórios do SAFEX (versão profissional)
+
+Crie no seu projeto (Git):
+
+```
+/safex
+  /rag
+    /collections
+      /seguranca
+      /indicacao
+      /protocolos_rm
+      /artefatos_rm
+      /tc_protocols (futuro)
+      /us_protocols (futuro)
+      /rx_principles (futuro)
+    /embeddings
+      seguranca.json
+      indicacao.json
+      rm_protocols.json
+      artefatos_rm.json
+    /raw_documents
+      /seguranca
+      /indicacao
+      /protocolos_rm
+      /artefatos_rm
+    /indexers
+      index_seguranca.js
+      index_indicacao.js
+      index_protocolos_rm.js
+      index_artefatos.js
+  /engine
+    rag_engine.js
+    safex_router.js
+  /models
+    safex_medico.js
+    safex_profissional.js
+    safex_tecnologo_rm.js
+    safex_paciente.js
+```
+
+Isso te dá:
+
+* organização,
+* escalabilidade,
+* clareza.
+
+---
+
+# ✔ 2. Estrutura das Coleções (RAG Collections)
+
+### **Coleção 1 — Segurança (seguranca/)**
+
+Conteúdo:
+
+* resumo de ESUR 2022–2024
+* ACR Manual Contrast
+* ANVISA radiação
+* precauções em gestantes
+* pediatria
+* nefrotoxicidade
+* implantes → MR Safe / Conditional
+* gadolínios (Grupos I–II)
+
+Formato:
+
+```
+raw_documents/seguranca/
+  esur_contrast_2024_resumo.md
+  acr_contrast_manual_resumo.md
+  anvisa_radiacao_resumo.md
+  gadolinio_grupos.md
+  implantes_condicoes_resumo.md
+```
+
+---
+
+### **Coleção 2 — Indicação de Exame (indicacao/)**
+
+Conteúdo:
+
+* resumo de ACR Appropriateness Criteria
+* diretrizes CBR
+* fluxos por sintomas (cefaleia, trauma, AVC, dor abdominal etc.)
+
+---
+
+### **Coleção 3 — Protocolos RM (protocolos_rm/)**
+
+Conteúdo:
+
+* crânio → T1/T2/FLAIR/SWI/DWI
+* coluna cervical/lombar
+* abdome
+* articulações
+* protocolos 1,5T e 3T
+* tempos, parâmetros, coil, posição, cortes
+
+---
+
+### **Coleção 4 — Artefatos RM (artefatos_rm/)**
+
+Conteúdo:
+
+* Movimento
+* Ghosting
+* Susceptibilidade
+* Aliasing (wrap-around)
+* Chemical shift
+* Inhomogeneidade de campo
+* RF zipper artifact
+* Truncation (Gibbs)
+
+Cada item com:
+
+* causa
+* aparência
+* sequência mais afetada
+* ajustes técnicos para corrigir
+* limites do aparelho
+* soluções gerais
+
+---
+
+# ✔ 3. Formato Padronizado dos Documentos
+
+Todos os documentos devem seguir esta estrutura:
+
+```
+# Nome da Diretriz ou Protocolo
+Versão: 2024
+Autor: Pedro / WiHealth
+Data: 2024-XX-XX
+Modalidade: RM / TC / Segurança
+Categoria: Ex: Artefatos / Segurança / Indicação
+Nível: Interno / Público / Restrito
+
+## Resumo Executivo
+(Regras gerais em 4–6 linhas)
+
+## Conteúdo Técnico
+(Detalhado, organizado por seções)
+
+## Recomendações
+- ...
+- ...
+- ...
+
+## Notas de Segurança
+- ...
+- ...
+```
+
+Isso facilita o chunking e a busca.
+
+---
+
+# ✔ 4. Como o RAG vai funcionar no SAFEX
+
+O fluxo será assim:
+
+### 1) Usuário pergunta:
+
+> “Paciente com suspeita de esclerose múltipla. Melhor protocolo?”
+
+### 2) SAFEX identifica:
+
+* Perfil = Médico
+* Tema = Indicação + Protocolo RM
+
+### 3) SAFEX chama o RAG Engine:
+
+```
+rag.search(["indicacao", "protocolos_rm"], pergunta)
+```
+
+### 4) O RAG retorna 3–6 trechos relevantes.
+
+### 5) Esses trechos são inseridos no prompt:
+
+```
+role: "system",
+content: "Trechos relevantes encontrados:\n\n[trecho1]\n[trecho2]\n..."
+```
+
+### 6) A OpenAI responde com:
+
+* conhecimento do modelo
+* * diretrizes suas
+* * raciocínio clínico
+
+Resultado: **resposta precisa e validada.**
+
+---
+
+# ✔ 5. A Arquitetura Técnica do RAG
+
+Vou montar agora a espinha dorsal:
+
+## `/safex/rag/engine/rag_engine.js`
+
+Contém:
+
+* carregamento de embeddings
+* busca vetorial
+* cálculo de similaridade
+* seleção dos melhores trechos
+* retorno para o SAFEX
+
+## `/safex/rag/indexers/*`
+
+Scripts que geram embeddings e salvam em JSON ou Redis.
+
+---
+
+# ✔ 6. Você poderá usar várias coleções ao mesmo tempo
+
+Sim, como você perguntou:
+
+> “Posso usar os vários blocos em vários produtos diferentes?”
+
+Sim — a arquitetura foi feita exatamente para isso.
+
+Exemplos:
+
+### **Produto 1 — SAFEX Médico**
+
+Coleções usadas:
+
+* segurança
+* indicação
+
+### **Produto 2 — SAFEX Tecnólogo RM**
+
+Coleções usadas:
+
+* protocolos_rm
+* artefatos_rm
+
+### **Produto 3 — SAFEX Econômico (para redes)**
+
+Coleções usadas:
+
+* indicação
+* custo-benefício
+* protocolos simples
+
+### **Produto 4 — SAFEX Ensino**
+
+Coleções usadas:
+
+* tudo + explicações detalhadas
+
+### **Produto 5 — SAFEX Emergência**
+
+Coleções usadas:
+
+* protocolos rápidos
+* avaliação inicial
+
+Você só muda:
+
+* qual coleção consulta
+* qual prompt ativa
+
+A infraestrutura é a mesma.
+
+---
+
+# ✔ 7. Próximo passo quando você quiser começar o RAG
+
+Eu posso te entregar:
+
+### ✓ Os 4 primeiros documentos modelo (já prontos):
+
+* ESUR Contrast Safety
+* ACR Appropriateness
+* Artefatos RM
+* Protocolo RM Crânio
+
+### ✓ O script para gerar embeddings com OpenAI
+
+### ✓ O rag_engine.js
+
+### ✓ O código para integrar no seu index.js
+
+Você só precisa pedir:
+
+**“Pode gerar os arquivos iniciais do RAG.”**
+
+Enquanto isso, continue testando o fluxo atual — ele está pronto para ser evoluído.
