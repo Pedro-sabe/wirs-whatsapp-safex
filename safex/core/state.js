@@ -3,30 +3,43 @@
 const OpenAI = require("openai");
 const SYSTEM_PROMPT = require("../config/systemPrompt");
 
+// -----------------------------------------------------------------------------
+// Cliente OpenAI (único, reutilizado)
+// -----------------------------------------------------------------------------
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const sessions = new Map();
-const leads = new Map();
-const worklist = [];
+// -----------------------------------------------------------------------------
+// Estruturas em memória
+// -----------------------------------------------------------------------------
+const sessions = new Map(); // Sessões ativas por usuário (telefone)
+const leads = new Map();    // Cadastro básico por usuário
+const worklist = [];        // Lista de casos SAFEX (CWO simplificado)
 
-// Sessão por telefone (WhatsApp)
+// -----------------------------------------------------------------------------
+// SESSÃO (por userId = telefone WhatsApp)
+// -----------------------------------------------------------------------------
 function getSession(userId) {
   if (!sessions.has(userId)) {
-    const lead = leads.get(userId);
     sessions.set(userId, {
       estado: "INICIAL",
-      primeiroNome: lead?.firstName || null,
-      email: lead?.email || null,
-      perfil: lead?.role || null,
+      primeiroNome: null,
+      email: null,
+      perfil: null, // "MEDICO" | "PROF_SAUDE" | "OUTROS"
       historicoLLM: [],
       sessaoAtiva: true,
       feedback: null,
       duvidaAtual: null,
       riscoAtual: null,
       casoAtualId: null,
+      lastInteraction: Date.now(), // usado para timeout por inatividade
     });
+  } else {
+    const s = sessions.get(userId);
+    if (!s.lastInteraction) {
+      s.lastInteraction = Date.now();
+    }
   }
   return sessions.get(userId);
 }
@@ -35,23 +48,32 @@ function saveSession(userId, session) {
   sessions.set(userId, session);
 }
 
+// -----------------------------------------------------------------------------
+// LEAD (cadastro básico do usuário, reaproveitado entre sessões)
+// -----------------------------------------------------------------------------
 function atualizarLead(userId, session) {
   if (!session.primeiroNome || !session.email || !session.perfil) return;
+
   const now = new Date().toISOString();
   const existente = leads.get(userId);
+
   const lead = {
     leadId: existente?.leadId || `SX-L-${String(leads.size + 1).padStart(6, "0")}`,
     phoneNumber: userId,
     firstName: session.primeiroNome,
     email: session.email,
-    role: session.perfil,
-    emailConfirmed: true, // confirmação via chat (MVP)
+    role: session.perfil,       // "MEDICO" | "PROF_SAUDE" | "OUTROS"
+    emailConfirmed: true,       // confirmado via fluxo de chat (MVP)
     createdAt: existente?.createdAt || now,
     updatedAt: now,
   };
+
   leads.set(userId, lead);
 }
 
+// -----------------------------------------------------------------------------
+// WORKLIST / CWO_ID (MVP imagem)
+// -----------------------------------------------------------------------------
 function gerarCwoId() {
   const numero = worklist.length + 1;
   const ano = new Date().getFullYear();
@@ -60,24 +82,30 @@ function gerarCwoId() {
 
 function criarCasoNaWorklist(userId, session) {
   if (session.casoAtualId) return session.casoAtualId;
+
   const cwoId = gerarCwoId();
   const now = new Date().toISOString();
   const lead = leads.get(userId);
+
   const caso = {
     cwoId,
     leadId: lead?.leadId || null,
     phoneNumber: userId,
-    workflowType: "imagem",
+    workflowType: "imagem", // preparado para futuros: "laboratorio", "endoscopia", etc.
     status: "em_analise",
     createdAt: now,
     updatedAt: now,
     lastInteractionAt: now,
   };
+
   worklist.push(caso);
   session.casoAtualId = cwoId;
   return cwoId;
 }
 
+// -----------------------------------------------------------------------------
+// Montagem do prompt clínico para o LLM (MVP)
+// -----------------------------------------------------------------------------
 function montarPromptClinico(session) {
   const perfil =
     session.perfil === "MEDICO"
@@ -115,6 +143,9 @@ function montarPromptClinico(session) {
   return texto;
 }
 
+// -----------------------------------------------------------------------------
+// Chamada ao LLM (SAFEX clínico) usando SYSTEM_PROMPT
+// -----------------------------------------------------------------------------
 async function chamarSafex(session) {
   const texto = montarPromptClinico(session);
   const historico = session.historicoLLM || [];
@@ -142,6 +173,9 @@ async function chamarSafex(session) {
   return resposta;
 }
 
+// -----------------------------------------------------------------------------
+// Export
+// -----------------------------------------------------------------------------
 module.exports = {
   getSession,
   saveSession,

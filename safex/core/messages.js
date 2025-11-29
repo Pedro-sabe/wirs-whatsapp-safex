@@ -1,22 +1,21 @@
 // safex/core/messages.js
 
-function mensagemInicialConsentimento(session) {
-  const saudacaoNome = session.primeiroNome ? `Olá, ${session.primeiroNome}. ` : "Olá, ";
-  const introCadastro = session.primeiroNome
-    ? ""
-    : "\n\nVou fazer poucas perguntas e depois te dou um auxílio orientativo sobre o exame.\n";
+// -----------------------------------------------------------------------------
+// Mensagens fixas do fluxo SAFEX (simplificadas e alinhadas ao MVP)
+// -----------------------------------------------------------------------------
 
+// 0. Mensagem inicial + consentimento
+function mensagemInicialConsentimento() {
   return (
-    `${saudacaoNome}eu sou o SAFEX, assistente para segurança e adequação de exames de imagem.\n` +
-    introCadastro +
-    "\nImportante:\n" +
-    "• Não substitui consulta médica presencial.\n" +
-    "• Não deve ser usado em casos de urgência ou emergência.\n" +
-    "• Em situações graves, procure imediatamente um serviço de emergência.\n\n" +
-    "Privacidade:\n" +
-    "• Não envie documentos, fotos ou arquivos.\n" +
-    "• Não envie nome completo, CPF, RG, endereço ou número de prontuário.\n\n" +
-    "Você concorda em seguir com o atendimento pelo SAFEX?\n" +
+    "Olá, sou o SAFEX — Assistente de apoio à decisão em exames de imagem.\n\n" +
+    "Posso orientar, de forma geral, sobre:\n" +
+    "• Qual exame pode ser mais adequado\n" +
+    "• Questões de segurança (contraste, implantes, gestação, radiação)\n\n" +
+    "Importante:\n" +
+    "• Não substitui consulta médica\n" +
+    "• Não usar em urgência/emergência\n" +
+    "• Não envie fotos, documentos ou dados pessoais\n\n" +
+    "Você concorda em seguir?\n" +
     "1 – Sim, concordo\n" +
     "2 – Não concordo"
   );
@@ -24,120 +23,109 @@ function mensagemInicialConsentimento(session) {
 
 function mensagemRecusaConsentimento() {
   return (
-    "Entendido. Sem o seu consentimento não posso seguir com o atendimento pelo SAFEX.\n" +
-    "Em caso de dúvida específica, procure o serviço de imagem ou o médico assistente."
+    "Tudo bem. O atendimento pelo SAFEX só pode ocorrer com consentimento.\n" +
+    "Em caso de dúvidas, procure seu médico ou serviço de imagem."
   );
 }
 
+// -----------------------------------------------------------------------------
+// 1. Coleta de Nome / Email / Perfil
+// -----------------------------------------------------------------------------
 function mensagemPedirPrimeiroNome() {
-  return "Para personalizar o atendimento, informe apenas o seu primeiro nome (sem sobrenome).";
+  return "Obrigado. Informe apenas seu primeiro nome.";
 }
 
 function mensagemPedirEmail(nome) {
-  return (
-    `Obrigado, ${nome}.\n\n` +
-    "Informe um e-mail de contato. Ele será usado apenas para confirmar seu cadastro e reconhecer você nas próximas vezes."
-  );
-}
-
-function mensagemConfirmarIdentidade(session) {
-  return (
-    "Confira seus dados:\n" +
-    `Nome: ${session.primeiroNome}\n` +
-    `E-mail: ${session.email}\n\n` +
-    "Está correto? (Responda SIM ou NÃO)"
-  );
+  return `Perfeito, ${nome}. Agora informe um e-mail de contato.`;
 }
 
 function mensagemPerguntarPerfil(nome) {
   return (
-    `Obrigado, ${nome}.\n\n` +
-    "Selecione a opção que melhor descreve você:\n" +
+    `Obrigado, ${nome}.\n` +
+    "Como você se identifica?\n" +
     "1 – Médico(a)\n" +
-    "2 – Profissional em Saúde\n" +
-    "3 – Paciente ou Acompanhante\n\n" +
-    "Responda apenas com o número."
+    "2 – Profissionais em Saúde\n" +
+    "3 – Outros (paciente, familiar, estudante)"
   );
 }
 
-function mensagemColetaDuvida(nome, perfil, recorrente = false) {
-  const prefixo = recorrente
-    ? `Olá novamente, ${nome}.\n\n`
-    : `Obrigado, ${nome}.\n\n`;
-
+// -----------------------------------------------------------------------------
+// 2. Coleta da dúvida principal — adaptada por perfil
+// -----------------------------------------------------------------------------
+function mensagemColetaDuvida(nome, perfil) {
   if (perfil === "MEDICO") {
     return (
-      prefixo +
-      "Em poucas palavras, escreva:\n" +
-      "• Situação clínica principal ou hipótese diagnóstica.\n" +
-      "• Exame(s) de imagem cogitado(s) ou solicitado(s).\n\n" +
-      "Não inclua nome completo, CPF ou dados que identifiquem o paciente."
-    );
-  } else if (perfil === "PROF_SAUDE") {
-    return (
-      prefixo +
-      "Em poucas palavras, escreva:\n" +
-      "• Motivo clínico principal do exame.\n" +
-      "• Exame de imagem cogitado (RM, TC, RX, USG etc.).\n\n" +
-      "Não inclua dados pessoais identificáveis."
-    );
-  } else {
-    return (
-      prefixo +
-      "Em poucas palavras, escreva:\n" +
-      "• Idade aproximada (ex.: 40 anos).\n" +
-      "• Motivo do exame (ex.: dor lombar, cefaleia, trauma).\n" +
-      "• Exame cogitado (se souber).\n\n" +
-      "Não envie nome completo, CPF ou dados pessoais."
+      `Certo, Dr(a). ${nome}.\n\n` +
+      "Descreva brevemente a situação clínica (sem identificar o paciente):\n" +
+      "• Hipótese diagnóstica ou motivo do exame\n" +
+      "• Método cogitado (RM, TC, RX, USG)\n" +
+      "• Dados relevantes: implantes, marca-passo, alergia a contraste, gestação, DRC, etc."
     );
   }
-}
 
-function mensagemChecklistRisco() {
+  if (perfil === "PROF_SAUDE") {
+    return (
+      `Obrigado, ${nome}.\n\n` +
+      "Informe, sem identificar o paciente:\n" +
+      "• Motivo principal\n" +
+      "• Exame cogitado\n" +
+      "• Situações importantes (prótese, gestação, alergia, risco clínico)."
+    );
+  }
+
   return (
-    "Há mais alguma informação importante para acrescentar?\n" +
-    "Em especial, informe se existir:\n" +
-    "• Alergia importante a medicamentos ou contrastes\n" +
-    "• Insuficiência renal conhecida\n" +
-    "• Marcapasso cardíaco ou desfibrilador implantável\n" +
-    "• Materiais metálicos no corpo (clipes, próteses, fragmentos)\n" +
-    "• Claustrofobia importante\n" +
-    "• Gestante ou suspeita de gestação\n" +
-    "• Criança ou idoso com dificuldade de permanecer parado\n" +
-    "• Aparelho dentário fixo\n\n" +
-    "Responda em poucas linhas. Se nada disso se aplicar, escreva apenas: 'Sem fatores adicionais relevantes'."
+    `Obrigado, ${nome}.\n\n` +
+    "Para tentar ajudar, informe:\n" +
+    "• Idade aproximada\n" +
+    "• Motivo (ex.: dor lombar, cefaleia)\n" +
+    "• Exame cogitado\n" +
+    "• Se há gestação, alergia importante ou implantes."
   );
 }
 
-function mensagemConfirmacaoDadosClinicos() {
+// -----------------------------------------------------------------------------
+// 3. Perguntas adicionais obrigatórias de segurança
+// -----------------------------------------------------------------------------
+function mensagemPerguntasAdicionais() {
   return (
-    "Recebi as informações.\n\n" +
-    "Se alguma coisa estiver incorreta ou faltando, você pode corrigir ou acrescentar agora.\n" +
-    "Se estiver tudo certo, responda apenas: OK."
+    "Antes de analisar, poderia informar se existe alguma dessas condições?\n\n" +
+    "Alergia importante?\n" +
+    "Insuficiência renal?\n" +
+    "Marca-passo cardíaco?\n" +
+    "Materiais metálicos no corpo?\n" +
+    "Claustrofobia?\n" +
+    "Gestante?\n" +
+    "Criança ou idoso com dificuldade de permanecer parado?\n" +
+    "Aparelho dentário fixo?\n\n" +
+    "Responda em um único parágrafo."
   );
 }
 
+// -----------------------------------------------------------------------------
+// 4. Mensagens de continuidade
+// -----------------------------------------------------------------------------
 function mensagemPosPerguntaMaisDuvida() {
   return (
-    "\n\nPosso ajudar com mais alguma dúvida sobre este ou outro exame de imagem?\n" +
-    "1 – Sim, tenho outra dúvida\n" +
-    "2 – Não, pode finalizar o atendimento"
+    "\n\nPosso ajudar com mais alguma dúvida?\n" +
+    "1 – Sim\n" +
+    "2 – Não, pode finalizar"
   );
 }
 
 function mensagemSolicitarNovaPergunta(nome) {
   return (
-    `Perfeito, ${nome}.\n\n` +
-    "Pode enviar sua próxima dúvida sobre exame de imagem, em texto."
+    `Perfeito, ${nome}.\n` +
+    "Pode enviar sua próxima dúvida (sem dados pessoais)."
   );
 }
 
+// -----------------------------------------------------------------------------
+// 5. Encerramento e Feedback
+// -----------------------------------------------------------------------------
 function mensagemEncerramento(nome) {
   return (
-    `Agradeço o seu contato, ${nome}.\n\n` +
-    "O SAFEX permanece disponível para dúvidas gerais sobre escolha de exames de imagem e segurança.\n\n" +
-    "Antes de encerrar, poderia avaliar se este atendimento foi útil para você?\n\n" +
-    "De 1 a 4, como você avalia o atendimento:\n" +
+    `Agradeço o contato, ${nome}.\n\n` +
+    "Antes de encerrar, poderia avaliar o atendimento?\n" +
     "1 – Não foi útil\n" +
     "2 – Ajudou pouco\n" +
     "3 – Ajudou\n" +
@@ -146,39 +134,39 @@ function mensagemEncerramento(nome) {
 }
 
 function mensagemAgradecerFeedback() {
-  return "Obrigado pelo seu feedback. Ele ajuda a melhorar continuamente o SAFEX.";
+  return "Obrigado pelo feedback. Ele ajuda a melhorar continuamente o SAFEX.";
 }
 
+// -----------------------------------------------------------------------------
+// 6. Tratamento de erros / entradas inválidas
+// -----------------------------------------------------------------------------
 function mensagemNaoEntendiOpcao12() {
-  return "Não entendi a opção. Por favor, responda com 1 ou 2.";
+  return "Não entendi. Por favor, responda com 1 ou 2.";
 }
 
 function mensagemNaoEntendiOpcao14() {
-  return "Não entendi a opção. Por favor, responda com um número de 1 a 4.";
+  return "Não entendi. Responda com um número de 1 a 4.";
 }
 
 function mensagemSomenteTexto() {
   return (
-    "Por segurança, o SAFEX não processa documentos, imagens ou arquivos enviados.\n" +
-    "Copie e cole apenas o texto essencial do pedido médico ou resultado, sem nome completo, CPF, telefone ou outros dados pessoais."
+    "O SAFEX não processa arquivos, imagens ou documentos, " +
+    "para evitar compartilhamento de dados pessoais.\n" +
+    "Por favor, envie apenas texto descrevendo a situação."
   );
 }
 
-// MVP: não expõe WhatsApp/agenda do serviço
-function montarBlocoServico(session) {
-  return "";
-}
-
+// -----------------------------------------------------------------------------
+// Export
+// -----------------------------------------------------------------------------
 module.exports = {
   mensagemInicialConsentimento,
   mensagemRecusaConsentimento,
   mensagemPedirPrimeiroNome,
   mensagemPedirEmail,
-  mensagemConfirmarIdentidade,
   mensagemPerguntarPerfil,
   mensagemColetaDuvida,
-  mensagemChecklistRisco,
-  mensagemConfirmacaoDadosClinicos,
+  mensagemPerguntasAdicionais,
   mensagemPosPerguntaMaisDuvida,
   mensagemSolicitarNovaPergunta,
   mensagemEncerramento,
@@ -186,5 +174,4 @@ module.exports = {
   mensagemNaoEntendiOpcao12,
   mensagemNaoEntendiOpcao14,
   mensagemSomenteTexto,
-  montarBlocoServico,
 };

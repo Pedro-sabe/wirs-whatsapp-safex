@@ -3,9 +3,9 @@ const bodyParser = require("body-parser");
 const axios = require("axios");
 const OpenAI = require("openai");
 
-// Importa os “silos” SAFEX
-const { handleSafexMessage, mensagemSomenteTexto } = require("./safex/core/orchestrator");
-const SYSTEM_PROMPT = require("./safex/config/systemPrompt");
+// Importa os “silos” SAFEX (note o .. subindo um nível)
+const { handleSafexMessage, mensagemSomenteTexto } = require("../safex/core/orchestrator");
+const SYSTEM_PROMPT = require("../safex/config/systemPrompt");
 
 const app = express();
 app.use(bodyParser.json());
@@ -19,7 +19,7 @@ const openai = new OpenAI({
 // Rotas básicas de teste
 // -----------------------------------------------------------------------------
 app.get("/", (req, res) => {
-  res.status(200).send("SAFEX raiz OK");
+  res.status(200).send("SAFEX raiz OK (app/index.js)");
 });
 
 app.get("/health", (req, res) => {
@@ -83,8 +83,8 @@ app.post("/webhook", async (req, res) => {
       body.entry[0].changes[0].value.messages[0]
     ) {
       const message = body.entry[0].changes[0].value.messages[0];
-      const from = message.from;                 // telefone do usuário
-      const text = message.text?.body || "";     // texto (se houver)
+      const from = message.from; // telefone do usuário
+      const text = message.text?.body || "";
 
       console.log("Mensagem recebida do WhatsApp:", text || "[não texto]");
 
