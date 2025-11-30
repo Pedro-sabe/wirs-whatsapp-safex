@@ -106,9 +106,9 @@ function mensagemPerguntasAdicionais() {
 // -----------------------------------------------------------------------------
 function mensagemPosPerguntaMaisDuvida() {
   return (
-    "\n\nPosso ajudar com mais alguma dúvida?\n" +
-    "1 – Sim\n" +
-    "2 – Não, pode finalizar"
+      "\n\nComo deseja continuar?\n" +
+    "1 – Continuar este mesmo caso (acrescentar dúvidas ou detalhes)\n" +
+    "2 – Iniciar um novo caso"
   );
 }
 

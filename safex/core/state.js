@@ -33,13 +33,11 @@ function getSession(userId) {
       duvidaAtual: null,
       riscoAtual: null,
       casoAtualId: null,
-      lastInteraction: Date.now(), // usado para timeout por inatividade
+      lastInteraction: Date.now(),
     });
   } else {
     const s = sessions.get(userId);
-    if (!s.lastInteraction) {
-      s.lastInteraction = Date.now();
-    }
+    if (!s.lastInteraction) s.lastInteraction = Date.now();
   }
   return sessions.get(userId);
 }
@@ -49,7 +47,7 @@ function saveSession(userId, session) {
 }
 
 // -----------------------------------------------------------------------------
-// LEAD (cadastro básico do usuário, reaproveitado entre sessões)
+// LEAD (cadastro básico do usuário)
 // -----------------------------------------------------------------------------
 function atualizarLead(userId, session) {
   if (!session.primeiroNome || !session.email || !session.perfil) return;
@@ -62,8 +60,8 @@ function atualizarLead(userId, session) {
     phoneNumber: userId,
     firstName: session.primeiroNome,
     email: session.email,
-    role: session.perfil,       // "MEDICO" | "PROF_SAUDE" | "OUTROS"
-    emailConfirmed: true,       // confirmado via fluxo de chat (MVP)
+    role: session.perfil,
+    emailConfirmed: true,
     createdAt: existente?.createdAt || now,
     updatedAt: now,
   };
@@ -72,7 +70,7 @@ function atualizarLead(userId, session) {
 }
 
 // -----------------------------------------------------------------------------
-// WORKLIST / CWO_ID (MVP imagem)
+// WORKLIST / CWO_ID
 // -----------------------------------------------------------------------------
 function gerarCwoId() {
   const numero = worklist.length + 1;
@@ -91,7 +89,7 @@ function criarCasoNaWorklist(userId, session) {
     cwoId,
     leadId: lead?.leadId || null,
     phoneNumber: userId,
-    workflowType: "imagem", // preparado para futuros: "laboratorio", "endoscopia", etc.
+    workflowType: "imagem",
     status: "em_analise",
     createdAt: now,
     updatedAt: now,
@@ -104,7 +102,7 @@ function criarCasoNaWorklist(userId, session) {
 }
 
 // -----------------------------------------------------------------------------
-// Montagem do prompt clínico para o LLM (MVP)
+// Montagem do prompt clínico
 // -----------------------------------------------------------------------------
 function montarPromptClinico(session) {
   const perfil =
@@ -144,10 +142,10 @@ function montarPromptClinico(session) {
 }
 
 // -----------------------------------------------------------------------------
-// Chamada ao LLM (SAFEX clínico) usando SYSTEM_PROMPT
+// Chamada ao LLM (com limpeza e normalização de resposta)
 // -----------------------------------------------------------------------------
-async function chamarSafex(session) {
-  const texto = montarPromptClinico(session);
+async function chamarSafex(session, textoManual = null) {
+  const texto = textoManual || montarPromptClinico(session);
   const historico = session.historicoLLM || [];
 
   const messages = [
@@ -162,8 +160,20 @@ async function chamarSafex(session) {
     temperature: 0.1,
   });
 
-  const resposta = (completion.choices[0].message.content || "").trim();
+  let resposta = completion.choices[0].message.content || "";
 
+  // 🔧 Limpeza avançada — remove frases redundantes e blocos automáticos
+  resposta = resposta
+    .replace(/posso[\s\S]{0,20}ajudar[\s\S]{0,200}$/gi, "") // “Posso ajudar com mais alguma dúvida?”
+    .replace(/\n?\s*1\s*[-–]\s*sim[\s\S]{0,50}$/gi, "")
+    .replace(/\n?\s*2\s*[-–]\s*(nao|não)[\s\S]{0,50}$/gi, "")
+    .replace(/Análise baseada em diretrizes vigentes[\s\S]{0,50}(Requer validação do radiologista responsável e do médico solicitante\.)?/gi,
+      "Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.")
+    .replace(/(Análise baseada[\s\S]{0,100})\1+/gi, "$1") // remove duplicatas da frase final
+    .replace(/\n{2,}/g, "\n\n")
+    .trim();
+
+  // Atualiza histórico
   session.historicoLLM = [
     ...historico,
     { role: "user", content: texto },
