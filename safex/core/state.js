@@ -2,6 +2,7 @@
 
 const OpenAI = require("openai");
 const SYSTEM_PROMPT = require("../config/systemPrompt");
+const { obterContextoRAG } = require("./rag_engine"); // ← integração RAG
 
 // -----------------------------------------------------------------------------
 // Cliente OpenAI (único, reutilizado)
@@ -13,12 +14,12 @@ const openai = new OpenAI({
 // -----------------------------------------------------------------------------
 // Estruturas em memória
 // -----------------------------------------------------------------------------
-const sessions = new Map(); // Sessões ativas por usuário (telefone)
-const leads = new Map();    // Cadastro básico por usuário
-const worklist = [];        // Lista de casos SAFEX (CWO simplificado)
+const sessions = new Map();
+const leads = new Map();
+const worklist = [];
 
 // -----------------------------------------------------------------------------
-// SESSÃO (por userId = telefone WhatsApp)
+// Sessão por usuário (telefone WhatsApp)
 // -----------------------------------------------------------------------------
 function getSession(userId) {
   if (!sessions.has(userId)) {
@@ -26,7 +27,7 @@ function getSession(userId) {
       estado: "INICIAL",
       primeiroNome: null,
       email: null,
-      perfil: null, // "MEDICO" | "PROF_SAUDE" | "OUTROS"
+      perfil: null,
       historicoLLM: [],
       sessaoAtiva: true,
       feedback: null,
@@ -47,7 +48,7 @@ function saveSession(userId, session) {
 }
 
 // -----------------------------------------------------------------------------
-// LEAD (cadastro básico do usuário)
+// Lead (cadastro básico do usuário)
 // -----------------------------------------------------------------------------
 function atualizarLead(userId, session) {
   if (!session.primeiroNome || !session.email || !session.perfil) return;
@@ -70,7 +71,7 @@ function atualizarLead(userId, session) {
 }
 
 // -----------------------------------------------------------------------------
-// WORKLIST / CWO_ID
+// Worklist / CWO_ID
 // -----------------------------------------------------------------------------
 function gerarCwoId() {
   const numero = worklist.length + 1;
@@ -142,16 +143,30 @@ function montarPromptClinico(session) {
 }
 
 // -----------------------------------------------------------------------------
-// Chamada ao LLM (com limpeza e normalização de resposta)
+// Chamada ao LLM com integração RAG
 // -----------------------------------------------------------------------------
 async function chamarSafex(session, textoManual = null) {
-  const texto = textoManual || montarPromptClinico(session);
+  const textoClinico = textoManual || montarPromptClinico(session);
+
+  // 🔹 Consulta prévia ao RAG
+  let contextoRAG = "";
+  try {
+    contextoRAG = await obterContextoRAG(textoClinico);
+    if (contextoRAG && !contextoRAG.includes("Nenhuma diretriz")) {
+      contextoRAG = `\n\n📘 Diretrizes clínicas relevantes encontradas:\n${contextoRAG}\n\n---\n`;
+    } else {
+      contextoRAG = "";
+    }
+  } catch (err) {
+    console.error("Erro ao obter contexto RAG:", err.message);
+  }
+
   const historico = session.historicoLLM || [];
 
   const messages = [
     { role: "system", content: SYSTEM_PROMPT },
     ...historico,
-    { role: "user", content: texto },
+    { role: "user", content: textoClinico + contextoRAG },
   ];
 
   const completion = await openai.chat.completions.create({
@@ -162,21 +177,20 @@ async function chamarSafex(session, textoManual = null) {
 
   let resposta = completion.choices[0].message.content || "";
 
-  // 🔧 Limpeza avançada — remove frases redundantes e blocos automáticos
+  // 🔧 Limpeza avançada
   resposta = resposta
-    .replace(/posso[\s\S]{0,20}ajudar[\s\S]{0,200}$/gi, "") // “Posso ajudar com mais alguma dúvida?”
+    .replace(/posso[\s\S]{0,20}ajudar[\s\S]{0,200}$/gi, "")
     .replace(/\n?\s*1\s*[-–]\s*sim[\s\S]{0,50}$/gi, "")
     .replace(/\n?\s*2\s*[-–]\s*(nao|não)[\s\S]{0,50}$/gi, "")
     .replace(/Análise baseada em diretrizes vigentes[\s\S]{0,50}(Requer validação do radiologista responsável e do médico solicitante\.)?/gi,
       "Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.")
-    .replace(/(Análise baseada[\s\S]{0,100})\1+/gi, "$1") // remove duplicatas da frase final
+    .replace(/(Análise baseada[\s\S]{0,100})\1+/gi, "$1")
     .replace(/\n{2,}/g, "\n\n")
     .trim();
 
-  // Atualiza histórico
   session.historicoLLM = [
     ...historico,
-    { role: "user", content: texto },
+    { role: "user", content: textoClinico },
     { role: "assistant", content: resposta },
   ];
 
@@ -196,3 +210,4 @@ module.exports = {
   _worklist: worklist,
   _sessions: sessions,
 };
+
