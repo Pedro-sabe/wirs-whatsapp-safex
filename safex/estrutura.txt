@@ -1,0 +1,36 @@
+Listagem de caminhos de pasta para o volume OS
+O número de série do volume é D66C-EA09
+C:.
+¦   estrutura.txt
+¦   
++---config
+¦       systemPrompt.js
+¦       
++---core
+¦       messages.js
+¦       orchestrator.js
+¦       rag_engine.js
+¦       state.js
+¦       
++---data
+    +---ANALISES CLINICAS
+    +---CARDIOLOGIA
+    +---ENDOSCOPIA
+    +---IMAGEM
+        +---cintilografia
+        +---contraste
+        ¦       acr_guidelines.txt
+        ¦       anvisa_contraste.txt
+        ¦       cbr_recommendations.txt
+        ¦       esur_guidelines.txt
+        ¦       
+        +---Diretrizes diagnósticas
+        +---Diretrizes escolha exames
+        +---exames cardiologia imagem
+        +---pet
+        +---segurança
+        +---tecnicas em densitometria
+        +---tecnicas em mama
+        +---tecnicas em rm
+        +---tecnicas em rx
+        +---tecnicas em tc

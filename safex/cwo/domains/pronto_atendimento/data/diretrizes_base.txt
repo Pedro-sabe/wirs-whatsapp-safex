@@ -1,0 +1,3 @@
+# Diretrizes Base - PRONTO_ATENDIMENTO
+Este arquivo contém diretrizes iniciais de configuração do domínio **pronto_atendimento**.
+Atualize com protocolos e normas específicas de cada setor.

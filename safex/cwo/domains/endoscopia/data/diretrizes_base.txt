@@ -1,0 +1,3 @@
+# Diretrizes Base - ENDOSCOPIA
+Este arquivo contém diretrizes iniciais de configuração do domínio **endoscopia**.
+Atualize com protocolos e normas específicas de cada setor.

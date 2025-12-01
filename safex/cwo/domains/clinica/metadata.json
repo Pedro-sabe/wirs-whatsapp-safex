@@ -1,0 +1,9 @@
+{
+  "domain": "clinica",
+  "uuid": "901d6d45-f839-42dd-8126-f8955a7dc102",
+  "created_at": "2025-12-01T01:28:50.696Z",
+  "version": "1.0.0",
+  "author": "Sistema CWO Setup",
+  "description": "Domínio clinica criado automaticamente pelo setup CWO.",
+  "status": "ativo"
+}

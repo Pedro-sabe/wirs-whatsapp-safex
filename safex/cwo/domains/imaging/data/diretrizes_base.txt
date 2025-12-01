@@ -1,0 +1,3 @@
+# Diretrizes Base - IMAGING
+Este arquivo contém diretrizes iniciais de configuração do domínio **imaging**.
+Atualize com protocolos e normas específicas de cada setor.

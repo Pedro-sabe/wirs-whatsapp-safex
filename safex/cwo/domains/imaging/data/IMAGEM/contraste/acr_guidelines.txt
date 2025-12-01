@@ -1,0 +1,12 @@
+Uso de contraste iodado em tomografia computadorizada (TC):
+- Avaliar função renal (eGFR). Se eGFR < 30 mL/min/1,73m², considerar alternativa sem contraste.
+- Pacientes com eGFR entre 30 e 44 podem receber contraste com precaução e hidratação adequada.
+- Reações alérgicas prévias ao contraste iodado indicam necessidade de pré-medicação com corticosteroides e anti-histamínicos.
+- O risco de nefropatia induzida por contraste é baixo em pacientes com função renal preservada.
+
+Uso de contraste paramagnético (gadolínio) em ressonância magnética (RM):
+- Avaliar risco de fibrose sistêmica nefrogênica (FSN) em pacientes com eGFR < 30.
+- Evitar agentes lineares em pacientes com doença renal avançada.
+- Preferir gadolínios macrocilíclicos (menor risco de FSN).
+
+Referência: ACR Manual on Contrast Media, 2023.

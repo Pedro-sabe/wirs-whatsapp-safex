@@ -1,0 +1,56 @@
+{
+  "cwo_version": "1.0.0",
+  "generated_at": "2025-12-01T01:28:50.691Z",
+  "domains": [
+    {
+      "domain": "imaging",
+      "uuid": "4a0454d4-47d7-4d6a-a159-5db05b89470c",
+      "created_at": "2025-12-01T01:28:50.693Z",
+      "version": "1.0.0",
+      "author": "Sistema CWO Setup",
+      "description": "Domínio imaging criado automaticamente pelo setup CWO.",
+      "status": "ativo",
+      "path": "C:\\Users\\psabe\\OneDrive\\Documents\\wirs-whatsapp-safex\\safex\\cwo\\domains\\imaging"
+    },
+    {
+      "domain": "analises_clinicas",
+      "uuid": "033af764-d576-4039-8262-e6658a7b35aa",
+      "created_at": "2025-12-01T01:28:50.694Z",
+      "version": "1.0.0",
+      "author": "Sistema CWO Setup",
+      "description": "Domínio analises_clinicas criado automaticamente pelo setup CWO.",
+      "status": "ativo",
+      "path": "C:\\Users\\psabe\\OneDrive\\Documents\\wirs-whatsapp-safex\\safex\\cwo\\domains\\analises_clinicas"
+    },
+    {
+      "domain": "pronto_atendimento",
+      "uuid": "865d2a99-2288-42d9-bd26-c2ee5c378ec7",
+      "created_at": "2025-12-01T01:28:50.695Z",
+      "version": "1.0.0",
+      "author": "Sistema CWO Setup",
+      "description": "Domínio pronto_atendimento criado automaticamente pelo setup CWO.",
+      "status": "ativo",
+      "path": "C:\\Users\\psabe\\OneDrive\\Documents\\wirs-whatsapp-safex\\safex\\cwo\\domains\\pronto_atendimento"
+    },
+    {
+      "domain": "endoscopia",
+      "uuid": "ac7ef2fd-f6bc-4648-9968-89d6c2fea09f",
+      "created_at": "2025-12-01T01:28:50.696Z",
+      "version": "1.0.0",
+      "author": "Sistema CWO Setup",
+      "description": "Domínio endoscopia criado automaticamente pelo setup CWO.",
+      "status": "ativo",
+      "path": "C:\\Users\\psabe\\OneDrive\\Documents\\wirs-whatsapp-safex\\safex\\cwo\\domains\\endoscopia"
+    },
+    {
+      "domain": "clinica",
+      "uuid": "901d6d45-f839-42dd-8126-f8955a7dc102",
+      "created_at": "2025-12-01T01:28:50.696Z",
+      "version": "1.0.0",
+      "author": "Sistema CWO Setup",
+      "description": "Domínio clinica criado automaticamente pelo setup CWO.",
+      "status": "ativo",
+      "path": "C:\\Users\\psabe\\OneDrive\\Documents\\wirs-whatsapp-safex\\safex\\cwo\\domains\\clinica"
+    }
+  ]
+}
