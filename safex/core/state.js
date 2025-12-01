@@ -2,7 +2,7 @@
 
 const OpenAI = require("openai");
 const SYSTEM_PROMPT = require("../config/systemPrompt");
-const { obterContextoRAG } = require("./rag_engine"); // ← integração RAG
+const { obterContextoRAG } = require("./rag_engine"); // ✅ integração RAG — caminho correto
 
 // -----------------------------------------------------------------------------
 // Cliente OpenAI (único, reutilizado)
@@ -148,17 +148,18 @@ function montarPromptClinico(session) {
 async function chamarSafex(session, textoManual = null) {
   const textoClinico = textoManual || montarPromptClinico(session);
 
-  // 🔹 Consulta prévia ao RAG
+  // 🔹 Integração RAG (busca por diretrizes)
   let contextoRAG = "";
   try {
     contextoRAG = await obterContextoRAG(textoClinico);
-    if (contextoRAG && !contextoRAG.includes("Nenhuma diretriz")) {
+    if (contextoRAG && contextoRAG.trim().length > 0) {
       contextoRAG = `\n\n📘 Diretrizes clínicas relevantes encontradas:\n${contextoRAG}\n\n---\n`;
     } else {
       contextoRAG = "";
     }
   } catch (err) {
-    console.error("Erro ao obter contexto RAG:", err.message);
+    console.error("⚠️ Erro ao obter contexto RAG:", err.message);
+    contextoRAG = "";
   }
 
   const historico = session.historicoLLM || [];
@@ -175,15 +176,17 @@ async function chamarSafex(session, textoManual = null) {
     temperature: 0.1,
   });
 
-  let resposta = completion.choices[0].message.content || "";
+  let resposta = (completion.choices?.[0]?.message?.content || "").trim();
 
   // 🔧 Limpeza avançada
   resposta = resposta
     .replace(/posso[\s\S]{0,20}ajudar[\s\S]{0,200}$/gi, "")
     .replace(/\n?\s*1\s*[-–]\s*sim[\s\S]{0,50}$/gi, "")
     .replace(/\n?\s*2\s*[-–]\s*(nao|não)[\s\S]{0,50}$/gi, "")
-    .replace(/Análise baseada em diretrizes vigentes[\s\S]{0,50}(Requer validação do radiologista responsável e do médico solicitante\.)?/gi,
-      "Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante.")
+    .replace(
+      /Análise baseada em diretrizes vigentes[\s\S]{0,50}(Requer validação do radiologista responsável e do médico solicitante\.)?/gi,
+      "Análise baseada em diretrizes vigentes. Requer validação do radiologista responsável e do médico solicitante."
+    )
     .replace(/(Análise baseada[\s\S]{0,100})\1+/gi, "$1")
     .replace(/\n{2,}/g, "\n\n")
     .trim();
@@ -210,4 +213,3 @@ module.exports = {
   _worklist: worklist,
   _sessions: sessions,
 };
-
